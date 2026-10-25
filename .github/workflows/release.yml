@@ -81,8 +81,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-      - name: Set version
-        run: sed -i.bak -E '0,/^version = ".*"/s//version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml && rm -f Cargo.toml.bak
+      # - name: Set version
+      #   run: sed -i.bak -E '0,/^version = ".*"/s//version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml && rm -f Cargo.toml.bak
       - name: NASM (Windows, for ring)
         if: runner.os == 'Windows'
         run: choco install nasm -y --no-progress && echo "C:\Program Files\NASM" >> "$GITHUB_PATH"
@@ -171,12 +171,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           # Optional macOS signing + notarization (leave the secrets unset for unsigned builds)
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: apps/xmp-app
           args: ${{ matrix.args }}
