@@ -19,8 +19,8 @@ crates/
 ```bash
 createdb xmp                                   # any PostgreSQL >= 13
 cargo run --release -p xmp-server -- \
-    --db "host=localhost user=postgres dbname=xmp" \
-    --udp-public YOUR.PUBLIC.IP:4434           # advertised media address
+    --db "host=192.168.50.100 user=admin password=admin@cd123 dbname=xmp" \
+    --udp-public 192.168.50.157:4434           # advertised media address
 # first start writes data/cert.der (self-signed). Clients pin it:
 export XMP="cargo run --release -p xmp-cli -- --cert data/cert.der"
 $XMP register alice password1 ; $XMP register bob password2

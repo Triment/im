@@ -168,13 +168,22 @@ jobs:
           key: desktop-${{ matrix.name }}
       - run: npm ci
         working-directory: apps/xmp-app
-      - uses: tauri-apps/tauri-action@v0
+      - name: Build and upload desktop release
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           projectPath: apps/xmp-app
           args: ${{ matrix.args }}
-          releaseId: ${{ needs.prepare.outputs.release_id }}
+
+          # 只在推送版本标签时上传到 GitHub Release
+          tagName: ${{ needs.prepare.outputs.publish == 'true' && github.ref_name || '' }}
+          releaseName: XMP ${{ needs.prepare.outputs.version }}
+          releaseBody: See the assets below to download and install XMP.
+          releaseDraft: true
+          prerelease: false
+
+          # 同时保留 Actions 页面中的构建产物
           uploadWorkflowArtifacts: true
 
   # ------------------------------------------------------------------------------------------------
