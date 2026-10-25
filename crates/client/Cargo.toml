@@ -1,0 +1,24 @@
+[package]
+name = "xmp-client"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+xmp-proto = { workspace = true }
+xmp-media = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+quinn = { workspace = true }
+rustls = { workspace = true }
+rand = { workspace = true }
+blake3 = { workspace = true }
+webpki-roots = "0.26"
+
+[dev-dependencies]
+xmp-server = { path = "../server" }
+rand = { workspace = true }

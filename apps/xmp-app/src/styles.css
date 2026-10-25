@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 244 245 249;
+  --surface: 255 255 255;
+  --raised: 240 242 248;
+  --line: 226 229 238;
+  --ink: 22 24 35;
+  --dim: 112 118 140;
+  --brand: 99 102 241;
+  --good: 34 197 94;
+  --bad: 239 68 68;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: 11 12 18;
+    --surface: 20 22 32;
+    --raised: 31 34 48;
+    --line: 42 46 63;
+    --ink: 236 238 247;
+    --dim: 136 142 168;
+    --brand: 129 140 248;
+    color-scheme: dark;
+  }
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+  font-family: theme("fontFamily.sans");
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+input, textarea { user-select: text; }
+::selection { background: rgb(var(--brand) / .3); }
+
+* { scrollbar-width: thin; scrollbar-color: rgb(var(--line)) transparent; }
+*::-webkit-scrollbar { width: 8px; }
+*::-webkit-scrollbar-thumb { background: rgb(var(--line)); border-radius: 8px; }
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition active:scale-[.97] disabled:opacity-50 disabled:pointer-events-none; }
+  .btn-brand { @apply btn text-white shadow-lg shadow-brand/25 hover:brightness-110; background: linear-gradient(135deg, rgb(99 102 241), rgb(139 92 246)); }
+  .btn-ghost { @apply btn bg-raised text-ink hover:bg-line/70; }
+  .icon-btn { @apply inline-flex h-10 w-10 items-center justify-center rounded-full text-dim transition hover:bg-raised hover:text-ink active:scale-95; }
+  .field { @apply w-full rounded-xl border border-line bg-raised/60 px-3.5 py-2.5 text-sm outline-none transition placeholder:text-dim/70 focus:border-brand focus:ring-4 focus:ring-brand/15; }
+  .glass { background: rgb(var(--surface) / .72); backdrop-filter: blur(22px) saturate(1.4); -webkit-backdrop-filter: blur(22px) saturate(1.4); }
+}
+
+.aurora {
+  background:
+    radial-gradient(60% 50% at 15% 10%, rgb(99 102 241 / .30), transparent 60%),
+    radial-gradient(50% 45% at 90% 20%, rgb(236 72 153 / .20), transparent 60%),
+    radial-gradient(60% 55% at 60% 100%, rgb(14 165 233 / .22), transparent 60%),
+    rgb(var(--bg));
+}
+
+/* Call screen is always dark, independent of the system theme. */
+.call-aurora {
+  background:
+    radial-gradient(60% 55% at 18% 12%, rgb(99 102 241 / .55), transparent 62%),
+    radial-gradient(50% 50% at 88% 18%, rgb(236 72 153 / .38), transparent 62%),
+    radial-gradient(65% 60% at 60% 105%, rgb(14 165 233 / .42), transparent 62%),
+    #0a0b12;
+}

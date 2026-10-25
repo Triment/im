@@ -1,0 +1,13 @@
+[package]
+name = "xmp-codec"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+opus = "0.4"
+openh264 = "0.9.9"
+openh264-sys2 = "0.9.9"
+thiserror = { workspace = true }

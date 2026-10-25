@@ -1,0 +1,38 @@
+[workspace]
+resolver = "2"
+members = ["crates/proto", "crates/media", "crates/server", "crates/client", "crates/cli", "crates/codec", "crates/ffi"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+xmp-proto = { path = "crates/proto" }
+xmp-media = { path = "crates/media" }
+xmp-client = { path = "crates/client" }
+xmp-codec = { path = "crates/codec" }
+tokio = { version = "1", features = ["full"] }
+bytes = "1"
+thiserror = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+quinn = { version = "0.11", default-features = false, features = ["runtime-tokio", "rustls-ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rcgen = "0.13"
+chacha20poly1305 = "0.10"
+snow = "0.9"
+blake3 = "1"
+reed-solomon-erasure = "6"
+rand = "0.8"
+tokio-postgres = "0.7"
+deadpool-postgres = "0.14"
+argon2 = "0.5"
+clap = { version = "4", features = ["derive", "env"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+panic = "abort"

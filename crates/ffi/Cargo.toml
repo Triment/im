@@ -1,0 +1,15 @@
+[package]
+name = "xmp-ffi"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "xmp_ffi"
+crate-type = ["cdylib", "staticlib", "rlib"]
+doctest = false
+
+[dependencies]
+xmp-client = { workspace = true }
+xmp-codec = { workspace = true }
+xmp-proto = { workspace = true }
+tokio = { workspace = true }

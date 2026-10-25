@@ -1,0 +1,9 @@
+target/
+node_modules/
+dist/
+data/
+*.der
+*.jks
+*.keystore
+keystore.properties
+.DS_Store

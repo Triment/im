@@ -1,0 +1,293 @@
+name: Release
+
+# Push a tag like `v0.2.0` to build and publish: server binaries, desktop installers and a signed Android APK.
+# Run manually (workflow_dispatch) to build everything without publishing; artifacts stay on the run page.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  NDK_VERSION: "27.0.12077973"
+
+jobs:
+  # ------------------------------------------------------------------------------------------------
+  test:
+    name: Tests
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: System packages
+        run: sudo apt-get update && sudo apt-get install -y libopus-dev cmake nasm g++ pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --locked
+
+  # ------------------------------------------------------------------------------------------------
+  prepare:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      release_id: ${{ steps.rel.outputs.release_id }}
+      publish: ${{ steps.v.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        id: v
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create draft release
+        id: rel
+        if: steps.v.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --draft --title "XMP ${GITHUB_REF_NAME}" --generate-notes
+          id=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq ".[] | select(.tag_name==\"${GITHUB_REF_NAME}\") | .id" | head -n1)
+          echo "release_id=${id}" >> "$GITHUB_OUTPUT"
+
+  # ------------------------------------------------------------------------------------------------
+  server:
+    name: Server (${{ matrix.name }})
+    needs: [test, prepare]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x86_64,   os: ubuntu-22.04,     target: x86_64-unknown-linux-gnu }
+          - { name: linux-aarch64,  os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu }
+          - { name: macos-aarch64,  os: macos-14,         target: aarch64-apple-darwin }
+          - { name: macos-x86_64,   os: macos-14,         target: x86_64-apple-darwin }
+          - { name: windows-x86_64, os: windows-latest,   target: x86_64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set version
+        run: sed -i.bak -E '0,/^version = ".*"/s//version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml && rm -f Cargo.toml.bak
+      - name: NASM (Windows, for ring)
+        if: runner.os == 'Windows'
+        run: choco install nasm -y --no-progress && echo "C:\Program Files\NASM" >> "$GITHUB_PATH"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: server-${{ matrix.target }}
+      - name: Build
+        run: cargo build --release --locked -p xmp-server --target ${{ matrix.target }}
+      - name: Package
+        id: pkg
+        run: |
+          name="xmp-server-${{ needs.prepare.outputs.version }}-${{ matrix.name }}"
+          mkdir -p "dist/$name"
+          ext=""; [[ "${{ runner.os }}" == "Windows" ]] && ext=".exe"
+          cp "target/${{ matrix.target }}/release/xmp-server${ext}" "dist/$name/"
+          cp README.md "dist/$name/"
+          cp -r docs "dist/$name/docs" 2>/dev/null || true
+          cd dist
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            7z a "$name.zip" "$name" >/dev/null; echo "file=dist/$name.zip" >> "$GITHUB_OUTPUT"
+          else
+            tar -czf "$name.tar.gz" "$name"; echo "file=dist/$name.tar.gz" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.name }}
+          path: ${{ steps.pkg.outputs.file }}
+      - name: Upload to release
+        if: needs.prepare.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" "${{ steps.pkg.outputs.file }}" --clobber
+
+  # ------------------------------------------------------------------------------------------------
+  desktop:
+    name: Desktop (${{ matrix.name }})
+    needs: [test, prepare]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x86_64,   os: ubuntu-22.04,   args: "",                                rust_targets: "" }
+          - { name: macos-aarch64,  os: macos-14,       args: "--target aarch64-apple-darwin",   rust_targets: "aarch64-apple-darwin" }
+          - { name: macos-x86_64,   os: macos-14,       args: "--target x86_64-apple-darwin",    rust_targets: "x86_64-apple-darwin" }
+          - { name: windows-x86_64, os: windows-latest, args: "",                                rust_targets: "" }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf \
+            libssl-dev libxdo-dev libdbus-1-dev libopus-dev cmake nasm g++ pkg-config
+      - name: macOS packages
+        if: runner.os == 'macOS'
+        run: brew install nasm cmake
+      - name: Windows packages
+        if: runner.os == 'Windows'
+        shell: bash
+        run: choco install nasm -y --no-progress && echo "C:\Program Files\NASM" >> "$GITHUB_PATH"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/xmp-app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/xmp-app/src-tauri -> target
+          key: desktop-${{ matrix.name }}
+      - name: Set app version
+        shell: bash
+        env:
+          V: ${{ needs.prepare.outputs.version }}
+        run: |
+          node -e "const f='apps/xmp-app/src-tauri/tauri.conf.json';const j=JSON.parse(require('fs').readFileSync(f,'utf8'));j.version=process.env.V;require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
+      - run: npm ci
+        working-directory: apps/xmp-app
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # Optional macOS signing + notarization (leave the secrets unset for unsigned builds)
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          projectPath: apps/xmp-app
+          args: ${{ matrix.args }}
+          releaseId: ${{ needs.prepare.outputs.release_id }}
+          uploadWorkflowArtifacts: true
+
+  # ------------------------------------------------------------------------------------------------
+  android:
+    name: Android APK (signed)
+    needs: [test, prepare]
+    runs-on: ubuntu-22.04
+    # Best effort: the native codec stack (Opus + OpenH264) is cross-compiled for Android here.
+    # A failure does not block the rest of the release.
+    continue-on-error: true
+    env:
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require signing secrets for published builds
+        if: needs.prepare.outputs.publish == 'true'
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          for v in KS ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS; do
+            if [[ -z "${!v}" ]]; then echo "::error::Missing secret for $v (see docs/RELEASING.md). Refusing to publish a debug-signed APK."; exit 1; fi
+          done
+      - name: Decode keystore
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [[ -n "$KS" ]]; then
+            echo "$KS" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No keystore secret: the APK will be signed with the debug key (not for distribution)."
+          fi
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - name: NDK
+        run: |
+          sdkmanager --install "ndk;${NDK_VERSION}" "platforms;android-37" "build-tools;36.0.0" >/dev/null
+          echo "NDK_HOME=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+      - name: Build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake nasm g++ pkg-config
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/xmp-app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/xmp-app/src-tauri -> target
+          key: android
+      - name: Set app version
+        env:
+          V: ${{ needs.prepare.outputs.version }}
+        run: |
+          node -e "const f='apps/xmp-app/src-tauri/tauri.conf.json';const j=JSON.parse(require('fs').readFileSync(f,'utf8'));j.version=process.env.V;require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
+      - run: npm ci
+        working-directory: apps/xmp-app
+      - name: Build APK
+        working-directory: apps/xmp-app
+        run: npx tauri android build --apk
+      - name: Locate, verify signature and rename
+        id: apk
+        run: |
+          src=$(find apps/xmp-app/src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -n1)
+          test -n "$src" || { echo "::error::no release APK found"; exit 1; }
+          out="XMP-${{ needs.prepare.outputs.version }}-android.apk"
+          cp "$src" "$out"
+          "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$out"
+          echo "file=$out" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: ${{ steps.apk.outputs.file }}
+      - name: Upload to release
+        if: needs.prepare.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" "${{ steps.apk.outputs.file }}" --clobber
+
+  # ------------------------------------------------------------------------------------------------
+  publish:
+    name: Publish release
+    needs: [prepare, test, server, desktop, android]
+    if: ${{ !cancelled() && needs.prepare.outputs.publish == 'true' && needs.test.result == 'success' && needs.server.result == 'success' && needs.desktop.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Android status
+        run: |
+          if [[ "${{ needs.android.result }}" != "success" ]]; then
+            echo "::warning::Android build result: ${{ needs.android.result }} - the release has no APK."
+          fi
+      - name: Checksums and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir assets && cd assets
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern '*' || true
+          rm -f SHA256SUMS.txt
+          sha256sum * > SHA256SUMS.txt
+          gh release upload "$GITHUB_REF_NAME" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest

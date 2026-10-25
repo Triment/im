@@ -1,0 +1,17 @@
+[package]
+name = "xmp-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "xmp"
+path = "src/main.rs"
+
+[dependencies]
+xmp-client = { workspace = true }
+xmp-proto = { workspace = true }
+xmp-codec = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+tracing-subscriber = { workspace = true }
