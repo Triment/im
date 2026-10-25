@@ -51,6 +51,15 @@ jobs:
             echo "version=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
             echo "publish=false" >> "$GITHUB_OUTPUT"
           fi
+      - name: Check that the file versions match the tag (warning only)
+        if: steps.v.outputs.publish == 'true'
+        env:
+          TAG_VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          app=$(node -p "require('./apps/xmp-app/src-tauri/tauri.conf.json').version")
+          srv=$(grep -m1 '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+          [[ "$app" == "$TAG_VERSION" ]] || echo "::warning file=apps/xmp-app/src-tauri/tauri.conf.json::Tag is v$TAG_VERSION but the app version is $app. Bump it before tagging."
+          [[ "$srv" == "$TAG_VERSION" ]] || echo "::warning file=Cargo.toml::Tag is v$TAG_VERSION but the server version is $srv. Bump [workspace.package] before tagging."
       - name: Create draft release
         id: rel
         if: steps.v.outputs.publish == 'true'
@@ -81,8 +90,6 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-      # - name: Set version
-      #   run: sed -i.bak -E '0,/^version = ".*"/s//version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml && rm -f Cargo.toml.bak
       - name: NASM (Windows, for ring)
         if: runner.os == 'Windows'
         run: choco install nasm -y --no-progress && echo "C:\Program Files\NASM" >> "$GITHUB_PATH"
@@ -159,24 +166,11 @@ jobs:
         with:
           workspaces: apps/xmp-app/src-tauri -> target
           key: desktop-${{ matrix.name }}
-      - name: Set app version
-        shell: bash
-        env:
-          V: ${{ needs.prepare.outputs.version }}
-        run: |
-          node -e "const f='apps/xmp-app/src-tauri/tauri.conf.json';const j=JSON.parse(require('fs').readFileSync(f,'utf8'));j.version=process.env.V;require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
       - run: npm ci
         working-directory: apps/xmp-app
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          # Optional macOS signing + notarization (leave the secrets unset for unsigned builds)
-          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          # APPLE_ID: ${{ secrets.APPLE_ID }}
-          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: apps/xmp-app
           args: ${{ matrix.args }}
@@ -238,21 +232,17 @@ jobs:
           cache-dependency-path: apps/xmp-app/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+          targets: aarch64-linux-android,armv7-linux-androideabi
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/xmp-app/src-tauri -> target
           key: android
-      - name: Set app version
-        env:
-          V: ${{ needs.prepare.outputs.version }}
-        run: |
-          node -e "const f='apps/xmp-app/src-tauri/tauri.conf.json';const j=JSON.parse(require('fs').readFileSync(f,'utf8'));j.version=process.env.V;require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
       - run: npm ci
         working-directory: apps/xmp-app
       - name: Build APK
         working-directory: apps/xmp-app
-        run: npx tauri android build --apk
+        # ARM only: x86 / x86_64 are not built
+        run: npx tauri android build --apk --target aarch64 armv7
       - name: Locate, verify signature and rename
         id: apk
         run: |

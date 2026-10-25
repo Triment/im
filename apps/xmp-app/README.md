@@ -37,7 +37,7 @@ Mobile: `npm run tauri android init|dev`, `npm run tauri ios init|dev` (not buil
   If the keychain exists but fails, nothing is stored (no silent plaintext fallback). On mobile they use the app-private sandbox.
 
 ## Android
-`src-tauri/gen/android` is committed and includes release signing (see `docs/RELEASING.md`) plus CAMERA / RECORD_AUDIO permissions. Never built here.
+`src-tauri/gen/android` is committed and includes release signing (see `docs/RELEASING.md`) plus CAMERA / RECORD_AUDIO permissions. ARM only (arm64-v8a, armeabi-v7a): x86 targets are removed. Never built here.
 
 ## Known gaps
 * Software H.264 only (OpenH264). Next step is WebCodecs / platform hardware encoders behind the same IPC.
