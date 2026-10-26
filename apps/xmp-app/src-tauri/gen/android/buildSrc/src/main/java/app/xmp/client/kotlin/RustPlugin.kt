@@ -17,13 +17,15 @@ open class RustPlugin : Plugin<Project> {
     override fun apply(project: Project) = with(project) {
         config = extensions.create("rust", Config::class.java)
 
-        val defaultAbiList = listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64");
+        // x86 / x86_64 are intentionally not built (the native codec stack fails to compile for them).
+        // The three default lists below must stay index-aligned.
+        val defaultAbiList = listOf("arm64-v8a", "armeabi-v7a");
         val abiList = (findProperty("abiList") as? String)?.split(',') ?: defaultAbiList
 
-        val defaultArchList = listOf("arm64", "arm", "x86", "x86_64");
+        val defaultArchList = listOf("arm64", "arm");
         val archList = (findProperty("archList") as? String)?.split(',') ?: defaultArchList
 
-        val targetsList = (findProperty("targetList") as? String)?.split(',') ?: listOf("aarch64", "armv7", "i686", "x86_64")
+        val targetsList = (findProperty("targetList") as? String)?.split(',') ?: listOf("aarch64", "armv7")
 
         extensions.configure<ApplicationExtension> {
             @Suppress("UnstableApiUsage")

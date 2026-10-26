@@ -13,7 +13,7 @@ keytool -genkeypair -v -keystore "$out" -storetype PKCS12 -alias "$alias" -keyal
   -dname "CN=XMP, OU=Mobile, O=XMP, C=CN" >/dev/null
 echo
 echo "Created $out. Add these repository secrets (Settings -> Secrets and variables -> Actions):"
-echo "  ANDROID_KEYSTORE_BASE64   = $(base64 -i "$out" 2>/dev/null || base64 -i "$out" | tr -d '\n')"
+echo "  ANDROID_KEYSTORE_BASE64   = $(base64 -w0 "$out" 2>/dev/null || base64 "$out" | tr -d '\n')"
 echo "  ANDROID_KEYSTORE_PASSWORD = (the password you just typed)"
 echo "  ANDROID_KEY_ALIAS         = $alias"
 echo "  ANDROID_KEY_PASSWORD      = (same as the keystore password)"
