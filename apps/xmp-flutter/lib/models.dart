@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 enum FriendStatus { sent, received, friends }
 
 class Friend {

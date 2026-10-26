@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../store.dart';
-import '../models.dart';
 import 'avatar.dart';
 
 class Sidebar extends StatelessWidget {

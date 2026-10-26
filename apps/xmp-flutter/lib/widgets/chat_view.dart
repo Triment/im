@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../store.dart';
 import '../models.dart';
-import 'avatar.dart';
 
 class ChatView extends StatefulWidget {
   const ChatView({super.key});

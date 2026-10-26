@@ -18,7 +18,7 @@ lazy_static::lazy_static! {
 }
 
 #[derive(Default)]
-struct AppState {
+pub(crate) struct AppState {
     client: Mutex<Option<Client>>,
     call: StdMutex<Option<Arc<ActiveCall>>>,
 }
@@ -105,7 +105,7 @@ pub enum XmpEvent {
 pub fn init_app() {
     // Initialization logic if needed
 }
-
+use crate::frb_generated::StreamSink;
 pub async fn connect(
     server: String,
     server_name: String,
@@ -114,7 +114,7 @@ pub async fn connect(
     username: Option<String>,
     password: Option<String>,
     token: Option<String>,
-    sink: flutter_rust_bridge::StreamSink<XmpEvent>,
+    sink: StreamSink<XmpEvent>,
 ) -> Result<MeDto> {
     let pinned_cert = if let Some(b64) = cert_b64.as_deref().filter(|p| !p.trim().is_empty()) {
         Some(normalize_cert(b64)?)
