@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/proto", "crates/media", "crates/server", "crates/client", "crates/cli", "crates/codec", "crates/ffi"]
+members = ["crates/proto", "crates/media", "crates/server", "crates/client", "crates/cli", "crates/codec", "crates/ffi", "apps/xmp-flutter/rust"]
 
 [workspace.package]
 version = "0.1.0"

@@ -207,8 +207,8 @@ jobs:
   # ------------------------------------------------------------------------------------------------
   publish:
     name: Publish release
-    needs: [prepare, test, server, desktop, android, flutter-client]
-    if: ${{ !cancelled() && needs.prepare.outputs.publish == 'true' && needs.test.result == 'success' && needs.server.result == 'success' && needs.desktop.result == 'success' && needs.flutter-client.result == 'success' }}
+    needs: [prepare, test, server, flutter-client]
+    if: ${{ !cancelled() && needs.prepare.outputs.publish == 'true' && needs.test.result == 'success' && needs.server.result == 'success' && needs.flutter-client.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Android status
