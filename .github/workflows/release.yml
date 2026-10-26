@@ -127,158 +127,88 @@ jobs:
         run: gh release upload "$GITHUB_REF_NAME" "${{ steps.pkg.outputs.file }}" --clobber
 
   # ------------------------------------------------------------------------------------------------
-  desktop:
-    name: Desktop (${{ matrix.name }})
+  flutter-client:
+    name: Flutter (${{ matrix.target }})
     needs: [test, prepare]
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { name: linux-x86_64,   os: ubuntu-22.04,   args: "",                                rust_targets: "" }
-          - { name: macos-aarch64,  os: macos-14,       args: "--target aarch64-apple-darwin",   rust_targets: "aarch64-apple-darwin" }
-          - { name: macos-x86_64,   os: macos-14,       args: "--target x86_64-apple-darwin",    rust_targets: "x86_64-apple-darwin" }
-          - { name: windows-x86_64, os: windows-latest, args: "",                                rust_targets: "" }
+          - { target: android, os: ubuntu-latest,  path: build/app/outputs/flutter-apk/app-release.apk, out: XMP-android.apk }
+          - { target: macos,   os: macos-latest,   path: build/macos/Build/Products/Release/xmp_flutter.app, out: XMP-macos.app }
+          - { target: windows, os: windows-latest, path: build/windows/x64/runner/Release, out: XMP-windows }
+          - { target: linux,   os: ubuntu-latest,  path: build/linux/x64/release/bundle, out: XMP-linux }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen --version 2.0.0
+      - run: flutter pub get
+        working-directory: apps/xmp-flutter
+      - name: Generate Bridge
+        run: flutter_rust_bridge_codegen generate
+        working-directory: apps/xmp-flutter
       - name: Linux packages
-        if: runner.os == 'Linux'
+        if: matrix.target == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf \
-            libssl-dev libxdo-dev libdbus-1-dev libopus-dev cmake nasm g++ pkg-config
-      - name: macOS packages
-        if: runner.os == 'macOS'
-        run: brew install nasm cmake
-      - name: Windows packages
-        if: runner.os == 'Windows'
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+      - name: Build
+        run: flutter build ${{ matrix.target }} --release
+        working-directory: apps/xmp-flutter
+      - name: Package Windows
+        if: matrix.target == 'windows'
+        run: |
+          cd apps/xmp-flutter/build/windows/x64/runner/Release
+          7z a ../../../../../../../XMP-windows.zip *
         shell: bash
-        run: choco install nasm -y --no-progress && echo "C:\Program Files\NASM" >> "$GITHUB_PATH"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: apps/xmp-app/package-lock.json
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.rust_targets }}
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: apps/xmp-app/src-tauri -> target
-          key: desktop-${{ matrix.name }}
-      - run: npm ci
-        working-directory: apps/xmp-app
-      - name: Build and upload desktop release
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          projectPath: apps/xmp-app
-          args: ${{ matrix.args }}
-
-          # 只在推送版本标签时上传到 GitHub Release
-          tagName: ${{ needs.prepare.outputs.publish == 'true' && github.ref_name || '' }}
-          releaseName: XMP ${{ needs.prepare.outputs.version }}
-          releaseBody: See the assets below to download and install XMP.
-          releaseDraft: true
-          prerelease: false
-
-          # 同时保留 Actions 页面中的构建产物
-          uploadWorkflowArtifacts: true
-
-  # ------------------------------------------------------------------------------------------------
-  android:
-    name: Android APK (signed)
-    needs: [test, prepare]
-    runs-on: ubuntu-22.04
-    # Best effort: the native codec stack (Opus + OpenH264) is cross-compiled for Android here.
-    # A failure does not block the rest of the release.
-    continue-on-error: true
-    env:
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Require signing secrets for published builds
-        if: needs.prepare.outputs.publish == 'true'
-        env:
-          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      - name: Package Linux
+        if: matrix.target == 'linux'
         run: |
-          for v in KS ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS; do
-            if [[ -z "${!v}" ]]; then echo "::error::Missing secret for $v (see docs/RELEASING.md). Refusing to publish a debug-signed APK."; exit 1; fi
-          done
-      - name: Decode keystore
-        env:
-          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          cd apps/xmp-flutter/build/linux/x64/release/bundle
+          tar -czf ../../../../../../../XMP-linux.tar.gz *
+      - name: Package macOS
+        if: matrix.target == 'macos'
         run: |
-          if [[ -n "$KS" ]]; then
-            echo "$KS" | base64 -d > "$RUNNER_TEMP/release.jks"
-            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
-          else
-            echo "::warning::No keystore secret: the APK will be signed with the debug key (not for distribution)."
+          cd apps/xmp-flutter/build/macos/Build/Products/Release
+          zip -r ../../../../../../../XMP-macos.zip xmp_flutter.app
+      - name: Prepare Artifact
+        shell: bash
+        run: |
+          if [ "${{ matrix.target }}" == "android" ]; then
+            cp apps/xmp-flutter/build/app/outputs/flutter-apk/app-release.apk XMP-android.apk
+            echo "file=XMP-android.apk" >> "$GITHUB_OUTPUT"
+          elif [ "${{ matrix.target }}" == "windows" ]; then
+            echo "file=XMP-windows.zip" >> "$GITHUB_OUTPUT"
+          elif [ "${{ matrix.target }}" == "linux" ]; then
+            echo "file=XMP-linux.tar.gz" >> "$GITHUB_OUTPUT"
+          elif [ "${{ matrix.target }}" == "macos" ]; then
+            echo "file=XMP-macos.zip" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-      # SDK platform, Build Tools and NDK are installed (and cached) by amyu/setup-android, which also exports
-      # ANDROID_HOME, ANDROID_NDK_HOME and puts the NDK on PATH. Pinned to the v6.0 commit as its README advises.
-      - name: Android SDK + NDK
-        uses: amyu/setup-android@09345fc2cbed5b3a92beea84d843a22eac6cc841 # v6.0
-        with:
-          sdk-version: "37.0"
-          build-tools-version: "36.0.0"
-          ndk-version: ${{ env.NDK_VERSION }}
-      - name: Point the Tauri CLI at the NDK
-        run: echo "NDK_HOME=${ANDROID_NDK_HOME}" >> "$GITHUB_ENV"
-      - name: Build tools
-        run: sudo apt-get update && sudo apt-get install -y cmake nasm g++ pkg-config
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: apps/xmp-app/package-lock.json
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,armv7-linux-androideabi
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: apps/xmp-app/src-tauri -> target
-          key: android
-      - run: npm ci
-        working-directory: apps/xmp-app
-      - name: Build APK
-        working-directory: apps/xmp-app
-        # ARM only: x86 / x86_64 are not built
-        run: npx tauri android build --apk --target aarch64 armv7
-      - name: Locate, verify signature and rename
-        id: apk
-        run: |
-          src=$(find apps/xmp-app/src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -n1)
-          test -n "$src" || { echo "::error::no release APK found"; exit 1; }
-          out="XMP-${{ needs.prepare.outputs.version }}-android.apk"
-          cp "$src" "$out"
-          # AGP may install its own Build Tools revision, so pick the newest apksigner available
-          apksigner=$(find "${ANDROID_HOME}/build-tools" -name apksigner -type f | sort -V | tail -n1)
-          test -n "$apksigner" || { echo "::error::apksigner not found"; exit 1; }
-          "$apksigner" verify --verbose --print-certs "$out"
-          echo "file=$out" >> "$GITHUB_OUTPUT"
+        id: pkg
       - uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: ${{ steps.apk.outputs.file }}
+          name: flutter-${{ matrix.target }}
+          path: ${{ steps.pkg.outputs.file }}
       - name: Upload to release
         if: needs.prepare.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$GITHUB_REF_NAME" "${{ steps.apk.outputs.file }}" --clobber
+        run: gh release upload "$GITHUB_REF_NAME" "${{ steps.pkg.outputs.file }}" --clobber
 
   # ------------------------------------------------------------------------------------------------
   publish:
     name: Publish release
-    needs: [prepare, test, server, desktop, android]
-    if: ${{ !cancelled() && needs.prepare.outputs.publish == 'true' && needs.test.result == 'success' && needs.server.result == 'success' && needs.desktop.result == 'success' }}
+    needs: [prepare, test, server, desktop, android, flutter-client]
+    if: ${{ !cancelled() && needs.prepare.outputs.publish == 'true' && needs.test.result == 'success' && needs.server.result == 'success' && needs.desktop.result == 'success' && needs.flutter-client.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Android status

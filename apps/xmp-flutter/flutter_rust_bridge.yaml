@@ -1,0 +1,4 @@
+rust_input: rust/src/api.rs
+dart_output: lib/src/rust/frb_generated.dart
+rust_output: rust/src/frb_generated.rs
+dart_decl_output: lib/src/rust/api/api.dart

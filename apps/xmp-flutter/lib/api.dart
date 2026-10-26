@@ -1,0 +1,221 @@
+import 'dart:async';
+import 'dart:math';
+import 'models.dart';
+import 'src/rust/api/api.dart' as rust;
+
+abstract class XmpApi {
+  Future<Map<String, dynamic>> connect(Map<String, dynamic> args);
+  Future<void> logout();
+  Future<List<Friend>> friends();
+  Future<void> friendRequest(String username);
+  Future<void> friendAccept(int userId);
+  Future<List<Conv>> conversations();
+  Future<List<Msg>> sync(int conv, int after);
+  Future<Map<String, dynamic>> sendText(int to, String text);
+  Future<void> sendFile(int to, String path);
+  Future<void> downloadFile(String hash, int size, String dest);
+  Future<Map<String, dynamic>> callStart(int peer, bool video);
+  Future<Map<String, dynamic>> callAccept(String callId, int peer, bool video);
+  Future<void> callReject(String callId, int peer);
+  Future<void> callHangup();
+  Future<Map<String, dynamic>> callStats();
+  
+  Stream<Map<String, dynamic>> get onEvent;
+}
+
+class RustApi implements XmpApi {
+  final _eventController = StreamController<Map<String, dynamic>>.broadcast();
+
+  @override
+  Stream<Map<String, dynamic>> get onEvent => _eventController.stream;
+
+  @override
+  Future<Map<String, dynamic>> connect(Map<String, dynamic> args) async {
+    final me = await rust.connect(
+      server: args['server'],
+      serverName: args['server_name'],
+      certB64: args['cert_b64'],
+      mode: args['mode'],
+      username: args['username'],
+      password: args['password'],
+      token: args['token'],
+      sink: _eventSink(),
+    );
+    return {'user_id': me.userId, 'token': me.token};
+  }
+
+  rust.StreamSink<rust.XmpEvent> _eventSink() {
+    // In a real FRB setup, you'd pass the controller's sink directly or wrap it
+    // For this example, we'll just return a mock sink that pipes to our controller
+    throw UnimplementedError("FFI stream integration requires generated code");
+  }
+
+  @override
+  Future<void> logout() => rust.logout();
+
+  @override
+  Future<List<Friend>> friends() async {
+    final fs = await rust.getFriends();
+    return fs.map((f) => Friend(
+      id: f.id,
+      username: f.username,
+      displayName: f.displayName,
+      status: _parseStatus(f.status),
+    )).toList();
+  }
+
+  static FriendStatus _parseStatus(String status) {
+    switch (status) {
+      case 'sent': return FriendStatus.sent;
+      case 'received': return FriendStatus.received;
+      case 'friends': return FriendStatus.friends;
+      default: return FriendStatus.friends;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> sendText(int to, String text) async {
+    final res = await rust.sendText(to: to, text: text);
+    return {'conv': res.conv, 'seq': res.lastSeq, 'ts': DateTime.now().millisecondsSinceEpoch};
+  }
+
+  // ... Other methods would similarly call rust.functions ...
+  
+  @override
+  Future<void> friendRequest(String username) async {}
+  @override
+  Future<void> friendAccept(int userId) async {}
+  @override
+  Future<List<Conv>> conversations() async => [];
+  @override
+  Future<List<Msg>> sync(int conv, int after) async => [];
+  @override
+  Future<void> sendFile(int to, String path) async {}
+  @override
+  Future<void> downloadFile(String hash, int size, String dest) async {}
+  @override
+  Future<Map<String, dynamic>> callStart(int peer, bool video) async => {};
+  @override
+  Future<Map<String, dynamic>> callAccept(String callId, int peer, bool video) async => {};
+  @override
+  Future<void> callReject(String callId, int peer) async {}
+  @override
+  Future<void> callHangup() async {}
+  @override
+  Future<Map<String, dynamic>> callStats() async => {};
+}
+
+class DemoApi implements XmpApi {
+  final _eventController = StreamController<Map<String, dynamic>>.broadcast();
+
+  @override
+  Stream<Map<String, dynamic>> get onEvent => _eventController.stream;
+
+  @override
+  Future<Map<String, dynamic>> connect(Map<String, dynamic> args) async {
+    await Future.delayed(const Duration(milliseconds: 350));
+    final username = args['username'] ?? 'demo';
+    
+    Timer(const Duration(milliseconds: 300), () {
+      _eventController.add({'type': 'presence', 'user': 2, 'online': true});
+      _eventController.add({'type': 'presence', 'user': 4, 'online': true});
+    });
+    
+    return {'user_id': 1, 'token': username};
+  }
+
+  @override
+  Future<void> logout() async {}
+
+  @override
+  Future<List<Friend>> friends() async {
+    return [
+      Friend(id: 2, username: "mia", displayName: "Mia Chen", status: FriendStatus.friends),
+      Friend(id: 3, username: "leo", displayName: "Leo Park", status: FriendStatus.friends),
+      Friend(id: 4, username: "sofia", displayName: "Sofia Alvarez", status: FriendStatus.friends),
+      Friend(id: 5, username: "noah", displayName: "Noah Wright", status: FriendStatus.received),
+    ];
+  }
+
+  @override
+  Future<void> friendRequest(String username) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+  }
+
+  @override
+  Future<void> friendAccept(int userId) async {}
+
+  @override
+  Future<List<Conv>> conversations() async {
+    return [
+      Conv(conv: 1, peer: 2, lastSeq: 6),
+      Conv(conv: 2, peer: 3, lastSeq: 1),
+    ];
+  }
+
+  @override
+  Future<List<Msg>> sync(int conv, int after) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (conv == 1) {
+      return [
+        Msg(conv: 1, seq: 1, sender: 2, kind: 0, ts: now - 3600000 * 5, text: "周末的发布会彩排你来吗？"),
+        Msg(conv: 1, seq: 2, sender: 1, kind: 0, ts: now - 3600000 * 5 + 60000, text: "来！我把新的演示版本也带上"),
+        Msg(conv: 1, seq: 3, sender: 2, kind: 0, ts: now - 3600000 * 2, text: "太好了。视频通话的延迟现在多少？"),
+        Msg(conv: 1, seq: 4, sender: 1, kind: 0, ts: now - 3600000 * 2 + 90000, text: "P2P 直连下大概 40ms，丢包 10% 也很稳 ✨"),
+        Msg(conv: 1, seq: 5, sender: 2, kind: 1, ts: now - 600000, file: FileRef(name: "launch-keynote.pdf", size: 4820113, hash: "a" * 64)),
+        Msg(conv: 1, seq: 6, sender: 2, kind: 0, ts: now - 540000, text: "这是最新的讲稿，看看有没有要改的 🙌"),
+      ];
+    }
+    return [];
+  }
+
+  @override
+  Future<Map<String, dynamic>> sendText(int to, String text) async {
+    await Future.delayed(const Duration(milliseconds: 120));
+    return {
+      'conv': 1,
+      'seq': 100 + Random().nextInt(1000),
+      'ts': DateTime.now().millisecondsSinceEpoch,
+    };
+  }
+
+  @override
+  Future<void> sendFile(int to, String path) async {
+    await Future.delayed(const Duration(milliseconds: 600));
+  }
+
+  @override
+  Future<void> downloadFile(String hash, int size, String dest) async {
+    await Future.delayed(const Duration(milliseconds: 400));
+  }
+
+  @override
+  Future<Map<String, dynamic>> callStart(int peer, bool video) async {
+    await Future.delayed(const Duration(milliseconds: 1400));
+    return {'sas': '359 202'};
+  }
+
+  @override
+  Future<Map<String, dynamic>> callAccept(String callId, int peer, bool video) async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    return {'sas': '359 202'};
+  }
+
+  @override
+  Future<void> callReject(String callId, int peer) async {}
+
+  @override
+  Future<void> callHangup() async {}
+
+  @override
+  Future<Map<String, dynamic>> callStats() async {
+    return {
+      'path': 'p2p',
+      'video_target_kbps': 2400 + Random().nextInt(300),
+      'tx': 1200,
+      'rx': 1900,
+      'retransmits': 3,
+      'fec_recovered': 11,
+    };
+  }
+}

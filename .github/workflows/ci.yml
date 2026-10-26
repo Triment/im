@@ -52,3 +52,18 @@ jobs:
         working-directory: apps/xmp-app
       - run: cargo test --lib --locked
         working-directory: apps/xmp-app/src-tauri
+
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      - run: flutter pub get
+        working-directory: apps/xmp-flutter
+      - run: flutter analyze
+        working-directory: apps/xmp-flutter
+      - run: flutter test
+        working-directory: apps/xmp-flutter
