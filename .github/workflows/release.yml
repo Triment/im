@@ -1,7 +1,8 @@
 name: Release
 
-# Push a tag like `v0.2.0` to build and publish: server binaries, desktop installers and a signed Android APK.
-# Run manually (workflow_dispatch) to build everything without publishing; artifacts stay on the run page.
+# Push a tag like v0.2.0 to build and publish server binaries,
+# desktop installers and an Android APK.
+# Run manually (workflow_dispatch) to build everything without publishing.
 on:
   push:
     tags: ["v*"]
@@ -19,23 +20,55 @@ env:
   NDK_VERSION: "27.0.12077973"
 
 jobs:
-  # ------------------------------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
   test:
     name: Tests
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - name: System packages
-        run: sudo apt-get update && sudo apt-get install -y libopus-dev cmake nasm g++ pkg-config
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install flutter_rust_bridge_codegen
-        run: cargo install flutter_rust_bridge_codegen --version 2.0.0
-      - run: flutter_rust_bridge_codegen generate
-        working-directory: apps/xmp-flutter
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace --locked
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  # ------------------------------------------------------------------------------------------------
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libopus-dev \
+            libdbus-1-dev \
+            cmake \
+            nasm \
+            g++ \
+            pkg-config
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+
+      - name: Install cargo-expand
+        run: cargo install cargo-expand --locked
+
+      - name: Install Flutter dependencies
+        working-directory: apps/xmp-flutter
+        run: flutter pub get
+
+      - name: Generate Rust-Dart bridge
+        working-directory: apps/xmp-flutter
+        run: flutter_rust_bridge_codegen generate
+
+      - name: Run Rust tests
+        run: cargo test --workspace --locked
+
+  # ---------------------------------------------------------------------------
   prepare:
     name: Prepare release
     runs-on: ubuntu-latest
@@ -44,9 +77,12 @@ jobs:
       release_id: ${{ steps.rel.outputs.release_id }}
       publish: ${{ steps.v.outputs.publish }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Version
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version
         id: v
+        shell: bash
         run: |
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
@@ -55,15 +91,17 @@ jobs:
             echo "version=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
             echo "publish=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Check that the file versions match the tag (warning only)
+
+      - name: Check that file versions match the tag (warning only)
         if: steps.v.outputs.publish == 'true'
         env:
           TAG_VERSION: ${{ steps.v.outputs.version }}
         run: |
           app=$(grep '^version: ' apps/xmp-flutter/pubspec.yaml | cut -d' ' -f2 | cut -d'+' -f1)
-          srv=$(grep -m1 'version = ' Cargo.toml | sed -E 's/.*version = "(.*)"/\1/')
+          srv=$(grep -m1 'version = ' Cargo.toml | sed -E 's/.*version = "([^"]+)".*/\1/')
           [[ "$app" == "$TAG_VERSION" ]] || echo "::warning file=apps/xmp-flutter/pubspec.yaml::Tag is v$TAG_VERSION but the app version is $app. Bump it before tagging."
           [[ "$srv" == "$TAG_VERSION" ]] || echo "::warning file=Cargo.toml::Tag is v$TAG_VERSION but the server version is $srv. Bump [workspace.package] before tagging."
+
       - name: Create draft release
         id: rel
         if: steps.v.outputs.publish == 'true'
@@ -75,7 +113,7 @@ jobs:
           id=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq ".[] | select(.tag_name==\"${GITHUB_REF_NAME}\") | .id" | head -n1)
           echo "release_id=${id}" >> "$GITHUB_OUTPUT"
 
-  # ------------------------------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
   server:
     name: Server (${{ matrix.name }})
     needs: [test, prepare]
@@ -93,44 +131,58 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - name: NASM (Windows, for ring)
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install NASM (Windows, for ring)
         if: runner.os == 'Windows'
         run: choco install nasm -y --no-progress && echo "C:\Program Files\NASM" >> "$GITHUB_PATH"
-      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@v2
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
           key: server-${{ matrix.target }}
+
       - name: Build
         run: cargo build --release --locked -p xmp-server --target ${{ matrix.target }}
+
       - name: Package
         id: pkg
         run: |
           name="xmp-server-${{ needs.prepare.outputs.version }}-${{ matrix.name }}"
           mkdir -p "dist/$name"
-          ext=""; [[ "${{ runner.os }}" == "Windows" ]] && ext=".exe"
+          ext=""
+          [[ "${{ runner.os }}" == "Windows" ]] && ext=".exe"
           cp "target/${{ matrix.target }}/release/xmp-server${ext}" "dist/$name/"
           cp README.md "dist/$name/"
           cp -r docs "dist/$name/docs" 2>/dev/null || true
           cd dist
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            7z a "$name.zip" "$name" >/dev/null; echo "file=dist/$name.zip" >> "$GITHUB_OUTPUT"
+            7z a "$name.zip" "$name" >/dev/null
+            echo "file=dist/$name.zip" >> "$GITHUB_OUTPUT"
           else
-            tar -czf "$name.tar.gz" "$name"; echo "file=dist/$name.tar.gz" >> "$GITHUB_OUTPUT"
+            tar -czf "$name.tar.gz" "$name"
+            echo "file=dist/$name.tar.gz" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: server-${{ matrix.name }}
           path: ${{ steps.pkg.outputs.file }}
-      - name: Upload to release
+
+      - name: Upload to draft release
         if: needs.prepare.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" "${{ steps.pkg.outputs.file }}" --clobber
 
-  # ------------------------------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
   flutter-client:
     name: Flutter (${{ matrix.target }})
     needs: [test, prepare]
@@ -138,88 +190,137 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { target: android, os: ubuntu-latest,  path: build/app/outputs/flutter-apk/app-release.apk, out: XMP-android.apk }
-          - { target: macos,   os: macos-latest,   path: build/macos/Build/Products/Release/xmp_flutter.app, out: XMP-macos.app }
-          - { target: windows, os: windows-latest, path: build/windows/x64/runner/Release, out: XMP-windows }
-          - { target: linux,   os: ubuntu-latest,  path: build/linux/x64/release/bundle, out: XMP-linux }
+          - { target: android, os: ubuntu-latest,  out: XMP-android.apk }
+          - { target: macos,   os: macos-latest,   out: XMP-macos.zip }
+          - { target: windows, os: windows-latest, out: XMP-windows.zip }
+          - { target: linux,   os: ubuntu-latest,  out: XMP-linux.tar.gz }
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libgtk-3-dev \
+            libopus-dev \
+            libdbus-1-dev \
+            nasm \
+            g++
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
           cache: true
-      - name: Install Rust
+
+      - name: Set up Android SDK and NDK
+        if: matrix.target == 'android'
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        if: matrix.target == 'android'
+        shell: bash
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [[ -z "$SDK_ROOT" ]]; then
+            echo "Android SDK root was not set by setup-android" >&2
+            exit 1
+          fi
+          sdkmanager "ndk;${NDK_VERSION}"
+          echo "ANDROID_NDK_HOME=${SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=${SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
+
       - name: Install flutter_rust_bridge_codegen
-        run: cargo install flutter_rust_bridge_codegen --version 2.13.0
-      - run: flutter pub get
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+
+      - name: Install cargo-expand
+        run: cargo install cargo-expand --locked
+
+      - name: Install Flutter dependencies
         working-directory: apps/xmp-flutter
-      - name: Generate Bridge
+        run: flutter pub get
+
+      - name: Generate Rust-Dart bridge
+        working-directory: apps/xmp-flutter
         run: flutter_rust_bridge_codegen generate
+
+      - name: Build Flutter app
         working-directory: apps/xmp-flutter
-      - name: Linux packages
-        if: matrix.target == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libopus-dev
-      - name: Build
         run: flutter build ${{ matrix.target }} --release
-        working-directory: apps/xmp-flutter
+
       - name: Package Windows
         if: matrix.target == 'windows'
+        shell: bash
         run: |
           cd apps/xmp-flutter/build/windows/x64/runner/Release
           7z a ../../../../../../../XMP-windows.zip *
-        shell: bash
+
       - name: Package Linux
         if: matrix.target == 'linux'
+        shell: bash
         run: |
           cd apps/xmp-flutter/build/linux/x64/release/bundle
           tar -czf ../../../../../../../XMP-linux.tar.gz *
+
       - name: Package macOS
         if: matrix.target == 'macos'
+        shell: bash
         run: |
           cd apps/xmp-flutter/build/macos/Build/Products/Release
           zip -r ../../../../../../../XMP-macos.zip xmp_flutter.app
-      - name: Prepare Artifact
+
+      - name: Prepare artifact
+        id: pkg
         shell: bash
         run: |
-          if [ "${{ matrix.target }}" == "android" ]; then
+          if [[ "${{ matrix.target }}" == "android" ]]; then
             cp apps/xmp-flutter/build/app/outputs/flutter-apk/app-release.apk XMP-android.apk
             echo "file=XMP-android.apk" >> "$GITHUB_OUTPUT"
-          elif [ "${{ matrix.target }}" == "windows" ]; then
+          elif [[ "${{ matrix.target }}" == "windows" ]]; then
             echo "file=XMP-windows.zip" >> "$GITHUB_OUTPUT"
-          elif [ "${{ matrix.target }}" == "linux" ]; then
+          elif [[ "${{ matrix.target }}" == "linux" ]]; then
             echo "file=XMP-linux.tar.gz" >> "$GITHUB_OUTPUT"
-          elif [ "${{ matrix.target }}" == "macos" ]; then
+          elif [[ "${{ matrix.target }}" == "macos" ]]; then
             echo "file=XMP-macos.zip" >> "$GITHUB_OUTPUT"
           fi
-        id: pkg
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: flutter-${{ matrix.target }}
           path: ${{ steps.pkg.outputs.file }}
-      - name: Upload to release
+
+      - name: Upload to draft release
         if: needs.prepare.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" "${{ steps.pkg.outputs.file }}" --clobber
 
-  # ------------------------------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
   publish:
     name: Publish release
     needs: [prepare, test, server, flutter-client]
     if: ${{ !cancelled() && needs.prepare.outputs.publish == 'true' && needs.test.result == 'success' && needs.server.result == 'success' && needs.flutter-client.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checksums and publish
+      - name: Download release assets and generate checksums
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir assets && cd assets
+          mkdir assets
+          cd assets
           gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern '*' || true
           rm -f SHA256SUMS.txt
           sha256sum * > SHA256SUMS.txt
