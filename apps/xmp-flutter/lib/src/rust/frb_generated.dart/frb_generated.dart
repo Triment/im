@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1785040663;
+  int get rustContentHash => 2145471133;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -82,7 +82,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 abstract class RustLibApi extends BaseApi {
   Future<AppState> crateApiAppStateDefault();
 
-  Stream<XmpEvent> crateApiConnect(
+  Future<MeDto> crateApiConnect(
       {required String server,
       required String serverName,
       String? certB64,
@@ -90,6 +90,8 @@ abstract class RustLibApi extends BaseApi {
       String? username,
       String? password,
       String? token});
+
+  Stream<XmpEvent> crateApiCreateEventStream();
 
   Future<List<FriendDto>> crateApiGetFriends();
 
@@ -142,7 +144,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Stream<XmpEvent> crateApiConnect(
+  Future<MeDto> crateApiConnect(
       {required String server,
       required String serverName,
       String? certB64,
@@ -150,8 +152,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       String? username,
       String? password,
       String? token}) {
-    final sink = RustStreamSink<XmpEvent>();
-    unawaited(handler.executeNormal(NormalTask(
+    return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(server, serializer);
@@ -161,7 +162,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_opt_String(username, serializer);
         sse_encode_opt_String(password, serializer);
         sse_encode_opt_String(token, serializer);
-        sse_encode_StreamSink_xmp_event_Sse(sink, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
             funcId: 2, port: port_);
       },
@@ -170,19 +170,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         decodeErrorData: sse_decode_AnyhowException,
       ),
       constMeta: kCrateApiConnectConstMeta,
-      argValues: [
-        server,
-        serverName,
-        certB64,
-        mode,
-        username,
-        password,
-        token,
-        sink
-      ],
+      argValues: [server, serverName, certB64, mode, username, password, token],
       apiImpl: this,
-    )));
-    return sink.stream;
+    ));
   }
 
   TaskConstMeta get kCrateApiConnectConstMeta => const TaskConstMeta(
@@ -194,9 +184,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "mode",
           "username",
           "password",
-          "token",
-          "sink"
+          "token"
         ],
+      );
+
+  @override
+  Stream<XmpEvent> crateApiCreateEventStream() {
+    final sink = RustStreamSink<XmpEvent>();
+    unawaited(handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_StreamSink_xmp_event_Sse(sink, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 3, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiCreateEventStreamConstMeta,
+      argValues: [sink],
+      apiImpl: this,
+    )));
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiCreateEventStreamConstMeta => const TaskConstMeta(
+        debugName: "create_event_stream",
+        argNames: ["sink"],
       );
 
   @override
@@ -205,7 +220,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 3, port: port_);
+            funcId: 4, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_friend_dto,
@@ -228,7 +243,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 4, port: port_);
+            funcId: 5, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -251,7 +266,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 5, port: port_);
+            funcId: 6, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -277,7 +292,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_i_64(to, serializer);
         sse_encode_String(text, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 6, port: port_);
+            funcId: 7, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_conv_dto,

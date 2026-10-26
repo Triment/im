@@ -14,7 +14,10 @@ part 'api.freezed.dart';
 
 Future<void> initApp() => RustLib.instance.api.crateApiInitApp();
 
-Stream<XmpEvent> connect(
+Stream<XmpEvent> createEventStream() =>
+    RustLib.instance.api.crateApiCreateEventStream();
+
+Future<MeDto> connect(
         {required String server,
         required String serverName,
         String? certB64,

@@ -20,6 +20,7 @@ lazy_static::lazy_static! {
 pub(crate) struct AppState {
     client: Mutex<Option<Client>>,
     call: StdMutex<Option<Arc<ActiveCall>>>,
+    sink: StdMutex<Option<StreamSink<XmpEvent>>>,
 }
 
 struct ActiveCall {
@@ -104,7 +105,13 @@ pub enum XmpEvent {
 pub fn init_app() {
     // Initialization logic if needed
 }
+
 use crate::frb_generated::StreamSink;
+
+pub fn create_event_stream(sink: StreamSink<XmpEvent>) {
+    *STATE.sink.lock().unwrap() = Some(sink);
+}
+
 pub async fn connect(
     server: String,
     server_name: String,
@@ -113,7 +120,6 @@ pub async fn connect(
     username: Option<String>,
     password: Option<String>,
     token: Option<String>,
-    sink: StreamSink<XmpEvent>,
 ) -> Result<MeDto> {
     let pinned_cert = if let Some(b64) = cert_b64.as_deref().filter(|p| !p.trim().is_empty()) {
         Some(normalize_cert(b64)?)
@@ -140,10 +146,14 @@ pub async fn connect(
     tokio::spawn(async move {
         while let Some(m) = events.recv().await {
             if let Some(ev) = event_to_dto(&m) {
-                let _ = sink.add(ev);
+                if let Some(sink) = &*STATE.sink.lock().unwrap() {
+                    let _ = sink.add(ev);
+                }
             }
         }
-        let _ = sink.add(XmpEvent::Disconnected);
+        if let Some(sink) = &*STATE.sink.lock().unwrap() {
+            let _ = sink.add(XmpEvent::Disconnected);
+        }
     });
 
     Ok(me)
