@@ -28,6 +28,10 @@ jobs:
       - name: System packages
         run: sudo apt-get update && sudo apt-get install -y libopus-dev cmake nasm g++ pkg-config
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen --version 2.0.0
+      - run: flutter_rust_bridge_codegen generate
+        working-directory: apps/xmp-flutter
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --locked
 
@@ -56,9 +60,9 @@ jobs:
         env:
           TAG_VERSION: ${{ steps.v.outputs.version }}
         run: |
-          app=$(node -p "require('./apps/xmp-app/src-tauri/tauri.conf.json').version")
-          srv=$(grep -m1 '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
-          [[ "$app" == "$TAG_VERSION" ]] || echo "::warning file=apps/xmp-app/src-tauri/tauri.conf.json::Tag is v$TAG_VERSION but the app version is $app. Bump it before tagging."
+          app=$(grep '^version: ' apps/xmp-flutter/pubspec.yaml | cut -d' ' -f2 | cut -d'+' -f1)
+          srv=$(grep -m1 'version = ' Cargo.toml | sed -E 's/.*version = "(.*)"/\1/')
+          [[ "$app" == "$TAG_VERSION" ]] || echo "::warning file=apps/xmp-flutter/pubspec.yaml::Tag is v$TAG_VERSION but the app version is $app. Bump it before tagging."
           [[ "$srv" == "$TAG_VERSION" ]] || echo "::warning file=Cargo.toml::Tag is v$TAG_VERSION but the server version is $srv. Bump [workspace.package] before tagging."
       - name: Create draft release
         id: rel
@@ -150,7 +154,7 @@ jobs:
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
       - name: Install flutter_rust_bridge_codegen
-        run: cargo install flutter_rust_bridge_codegen --version 2.0.0
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0
       - run: flutter pub get
         working-directory: apps/xmp-flutter
       - name: Generate Bridge
@@ -160,7 +164,7 @@ jobs:
         if: matrix.target == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libopus-dev
       - name: Build
         run: flutter build ${{ matrix.target }} --release
         working-directory: apps/xmp-flutter
@@ -211,11 +215,6 @@ jobs:
     if: ${{ !cancelled() && needs.prepare.outputs.publish == 'true' && needs.test.result == 'success' && needs.server.result == 'success' && needs.flutter-client.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Android status
-        run: |
-          if [[ "${{ needs.android.result }}" != "success" ]]; then
-            echo "::warning::Android build result: ${{ needs.android.result }} - the release has no APK."
-          fi
       - name: Checksums and publish
         env:
           GH_TOKEN: ${{ github.token }}

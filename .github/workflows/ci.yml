@@ -15,43 +15,12 @@ jobs:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y libopus-dev cmake nasm g++ pkg-config
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen --version 2.0.0
+      - run: flutter_rust_bridge_codegen generate
+        working-directory: apps/xmp-flutter
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --locked
-
-  frontend:
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: apps/xmp-app
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: apps/xmp-app/package-lock.json
-      - run: npm ci
-      - run: npm run build
-
-  app-backend:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf libssl-dev libxdo-dev libdbus-1-dev \
-            libopus-dev cmake nasm g++ pkg-config
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: apps/xmp-app/src-tauri -> target
-      - run: npm ci && npm run build
-        working-directory: apps/xmp-app
-      - run: cargo test --lib --locked
-        working-directory: apps/xmp-app/src-tauri
 
   flutter:
     runs-on: ubuntu-latest
@@ -61,7 +30,13 @@ jobs:
         with:
           channel: 'stable'
           cache: true
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen --version 2.0.0
       - run: flutter pub get
+        working-directory: apps/xmp-flutter
+      - run: flutter_rust_bridge_codegen generate
         working-directory: apps/xmp-flutter
       - run: flutter analyze
         working-directory: apps/xmp-flutter
