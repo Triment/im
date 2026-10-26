@@ -86,3 +86,4 @@ Android/iOS targets are `cargo build --target aarch64-linux-android|aarch64-appl
 ## CI / releases
 `.github/workflows/ci.yml` runs tests and the frontend build on every push/PR; pushing a `v*` tag runs `release.yml`
 (server binaries for 5 platforms, desktop installers, a signed Android APK, checksums). Setup and signing: `docs/RELEASING.md`.
+docker run -d   --name xmp-server   --restart unless-stopped   -p 4433:4433/udp -p 4433:4433/tcp  -p 4434:4434/udp   --entrypoint /app/xmp-server   -e PGPASSWORD='admin@cd123'   xmp-server   --db 'host=search-postgres port=5432 user=admin password=admin@cd123 dbname=xmp'

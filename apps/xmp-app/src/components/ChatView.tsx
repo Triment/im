@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Download, FileText, MessageCircle, Paperclip, Phone, SendHorizontal, ShieldCheck, Video } from "lucide-react";
+import { Download, FileText, MessageCircle, Paperclip, Phone, SendHorizontal, ShieldCheck, Video, ChevronLeft } from "lucide-react";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, demoMode, Msg } from "../api";
 import { Xmp } from "../store";
@@ -63,19 +63,24 @@ export function ChatView({ xmp }: { xmp: Xmp }) {
 
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-bg">
-      <header className="glass z-10 flex items-center gap-3 border-b border-line px-6 py-3">
-        <Avatar name={peer.display_name} online={isOnline} size={42} />
+      <header className="glass z-10 flex items-center gap-2 border-b border-line px-4 py-3 sm:gap-3 sm:px-6">
+        <button className="icon-btn -ml-1 sm:hidden" onClick={() => xmp.selectPeer(0)}>
+          <ChevronLeft className="h-6 w-6" />
+        </button>
+        <Avatar name={peer.display_name} online={isOnline} size={40} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-base font-semibold">{peer.display_name}</div>
-          <div className="text-xs text-dim">{isOnline ? "在线" : "离线"} · @{peer.username}</div>
+          <div className="truncate text-base font-semibold leading-tight">{peer.display_name}</div>
+          <div className="truncate text-xs text-dim">{isOnline ? "在线" : "离线"} · @{peer.username}</div>
         </div>
-        <button className="icon-btn" title="语音通话" disabled={!isOnline} onClick={() => void xmp.startCall(false)}><Phone className="h-5 w-5" /></button>
-        <button className="icon-btn" title="视频通话" disabled={!isOnline} onClick={() => void xmp.startCall(true)}><Video className="h-5 w-5" /></button>
+        <div className="flex items-center gap-0.5 sm:gap-1">
+          <button className="icon-btn" title="语音通话" disabled={!isOnline} onClick={() => void xmp.startCall(false)}><Phone className="h-5 w-5" /></button>
+          <button className="icon-btn" title="视频通话" disabled={!isOnline} onClick={() => void xmp.startCall(true)}><Video className="h-5 w-5" /></button>
+        </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+      <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
         {msgs.length === 0 && (
-          <div className="mx-auto mt-16 flex max-w-xs flex-col items-center text-center text-sm text-dim">
+          <div className="mx-auto mt-16 flex max-w-xs flex-col items-center text-center text-sm text-dim px-4">
             <ShieldCheck className="mb-3 h-8 w-8 text-brand/70" />与 {peer.display_name} 的对话从这里开始
           </div>
         )}
@@ -90,12 +95,12 @@ export function ChatView({ xmp }: { xmp: Xmp }) {
               {newDay && <div className="my-4 text-center text-xs font-medium text-dim">{fmtDay(m.ts)}</div>}
               <div className={`flex animate-pop ${mine ? "justify-end" : "justify-start"} ${first ? "mt-3" : "mt-0.5"}`}>
                 <div
-                  className={`group relative max-w-[min(520px,72%)] px-4 py-2.5 text-[15px] leading-relaxed ${mine ? "text-white" : "bg-surface shadow-sm"} ${m.seq < 0 ? "opacity-60" : ""}`}
+                  className={`group relative max-w-[min(520px,85%)] sm:max-w-[min(520px,72%)] px-3.5 py-2 sm:px-4 sm:py-2.5 text-[15px] leading-relaxed ${mine ? "text-white" : "bg-surface shadow-sm"} ${m.seq < 0 ? "opacity-60" : ""}`}
                   style={{
                     background: mine ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : undefined,
-                    borderRadius: 20,
-                    borderBottomRightRadius: mine && last ? 6 : 20,
-                    borderBottomLeftRadius: !mine && last ? 6 : 20,
+                    borderRadius: 18,
+                    borderBottomRightRadius: mine && last ? 4 : 18,
+                    borderBottomLeftRadius: !mine && last ? 4 : 18,
                   }}
                 >
                   {m.kind === 1 && m.file ? <FileBubble m={m} mine={mine} toast={xmp.toast} /> : <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{m.text}</span>}
@@ -108,7 +113,7 @@ export function ChatView({ xmp }: { xmp: Xmp }) {
         <div ref={endRef} />
       </div>
 
-      <div className="px-6 pb-5 pt-2">
+      <div className="px-4 pb-4 pt-2 sm:px-6 sm:pb-5">
         <div className="glass flex items-end gap-1 rounded-[22px] border border-line p-1.5 shadow-lg shadow-black/5 transition focus-within:border-brand/60">
           <button className="icon-btn shrink-0" title="发送文件" onClick={() => void attach()}><Paperclip className="h-5 w-5" /></button>
           <textarea

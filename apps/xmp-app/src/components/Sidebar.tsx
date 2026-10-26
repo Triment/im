@@ -23,7 +23,7 @@ export function Sidebar({ xmp }: { xmp: Xmp }) {
   const preview = (m?: { kind: number; text?: string }) => (!m ? "开始聊天" : m.kind === 1 ? "📎 文件" : m.kind === 2 ? "🎤 语音" : m.text ?? "");
 
   return (
-    <aside className="flex h-full w-[320px] shrink-0 flex-col border-r border-line bg-surface">
+    <aside className="flex h-full w-full flex-col border-r border-line bg-surface">
       <div className="flex items-center gap-3 px-5 pb-3 pt-5">
         <Avatar name={xmp.me?.username ?? "?"} size={38} />
         <div className="min-w-0 flex-1">

@@ -12,8 +12,12 @@ export default function App() {
     <div className="relative h-full w-full overflow-hidden">
       {xmp.me ? (
         <div className="flex h-full">
-          <Sidebar xmp={xmp} />
-          <ChatView xmp={xmp} />
+          <div className={`${xmp.selected ? "hidden sm:flex" : "flex"} h-full w-full sm:w-[320px] shrink-0`}>
+            <Sidebar xmp={xmp} />
+          </div>
+          <div className={`${xmp.selected ? "flex" : "hidden sm:flex"} h-full min-w-0 flex-1`}>
+            <ChatView xmp={xmp} />
+          </div>
         </div>
       ) : (
         <Login xmp={xmp} />

@@ -63,6 +63,7 @@ export class MediaEngine {
   private stopped = false;
   private remote: HTMLCanvasElement | null = null;
   private lastRemoteFrame: { w: number; h: number; data: Uint8ClampedArray } | null = null;
+  onRemoteFrame?: () => void;
   muted = false;
 
   async start(wantVideo: boolean, q: VideoQuality = SD) {
@@ -116,21 +117,27 @@ export class MediaEngine {
     if (c && this.lastRemoteFrame) this.paint(this.lastRemoteFrame);
   }
 
-  onRemoteAudio = (pcm: ArrayBuffer) => { this.playback?.port.postMessage(pcm, [pcm]); };
+  onRemoteAudio = (pcm: ArrayBuffer) => {
+    if (this.ctx?.state === "suspended") void this.ctx.resume();
+    this.playback?.port.postMessage(pcm, [pcm]);
+  };
 
   onRemoteVideo = (buf: ArrayBuffer) => {
     const dv = new DataView(buf);
     const w = dv.getUint32(0, true), h = dv.getUint32(4, true);
+    if (w <= 0 || h <= 0 || w > 4096 || h > 4096) return;
     const frame = { w, h, data: new Uint8ClampedArray(buf, 8, w * h * 4) };
     this.lastRemoteFrame = frame;
     this.paint(frame);
+    if (this.onRemoteFrame) { this.onRemoteFrame(); this.onRemoteFrame = undefined; }
   };
 
   private paint(f: { w: number; h: number; data: Uint8ClampedArray }) {
     const c = this.remote;
     if (!c) return;
     if (c.width !== f.w || c.height !== f.h) { c.width = f.w; c.height = f.h; }
-    c.getContext("2d")!.putImageData(new ImageData(f.data as unknown as Uint8ClampedArray<ArrayBuffer>, f.w, f.h), 0, 0);
+    const ctx = c.getContext("2d", { alpha: false });
+    if (ctx) ctx.putImageData(new ImageData(f.data as any, f.w, f.h), 0, 0);
   }
 
   setMuted(m: boolean) { this.muted = m; this.stream?.getAudioTracks().forEach((t) => (t.enabled = !m)); }

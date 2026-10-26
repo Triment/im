@@ -19,9 +19,8 @@ export function CallView({ xmp }: { xmp: Xmp }) {
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(t); }, []);
   useEffect(() => {
     if (!call.video || call.status !== "connected") return;
-    const t = setInterval(() => { const c = canvasRef.current; if (c && c.width !== 300) setHasRemote(true); }, 400);
-    return () => clearInterval(t);
-  }, [call.video, call.status]);
+    call.engine.onRemoteFrame = () => setHasRemote(true);
+  }, [call.video, call.status, call.engine]);
 
   const connected = call.status === "connected";
   const path = call.stats?.path;
