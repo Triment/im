@@ -1,3 +1,4 @@
+```yaml
 name: CI
 
 on:
@@ -10,35 +11,65 @@ env:
 
 jobs:
   rust:
+    name: Rust Tests
     runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y libopus-dev cmake nasm g++ pkg-config
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install flutter_rust_bridge_codegen
-        run: cargo install flutter_rust_bridge_codegen --version 2.13.0
-      - run: flutter_rust_bridge_codegen generate
-        working-directory: apps/xmp-flutter
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace --locked
 
-  flutter:
-    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libopus-dev \
+            cmake \
+            nasm \
+            g++ \
+            pkg-config
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
           cache: true
-      - name: Install Rust
+      - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Install flutter_rust_bridge_codegen
-        run: cargo install flutter_rust_bridge_codegen --version 2.13.0
-      - run: flutter pub get
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+      - name: Install Flutter dependencies
         working-directory: apps/xmp-flutter
-      - run: flutter_rust_bridge_codegen generate
+        run: flutter pub get
+      - name: Generate Rust-Dart bridge
         working-directory: apps/xmp-flutter
-      - run: flutter analyze
+        run: flutter_rust_bridge_codegen generate
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Run Rust tests
+        run: cargo test --workspace --locked
+
+  flutter:
+    name: Flutter Analysis and Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+      - name: Install Flutter dependencies
         working-directory: apps/xmp-flutter
-      - run: flutter test
+        run: flutter pub get
+      - name: Generate Rust-Dart bridge
         working-directory: apps/xmp-flutter
+        run: flutter_rust_bridge_codegen generate
+      - name: Analyze Flutter code
+        working-directory: apps/xmp-flutter
+        run: flutter analyze
+      - name: Run Flutter tests
+        working-directory: apps/xmp-flutter
+        run: flutter test
