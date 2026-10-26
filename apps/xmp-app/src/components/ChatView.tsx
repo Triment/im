@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Download, FileText, MessageCircle, Paperclip, Phone, SendHorizontal, ShieldCheck, Video, ChevronLeft, Plus, Smile } from "lucide-react";
+import { Download, FileText, MessageCircle, Paperclip, Phone, ShieldCheck, Video, ChevronLeft, Plus, Smile } from "lucide-react";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, demoMode, Msg } from "../api";
 import { Xmp } from "../store";
