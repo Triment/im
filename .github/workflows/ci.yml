@@ -16,7 +16,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libopus-dev cmake nasm g++ pkg-config
       - uses: dtolnay/rust-toolchain@stable
       - name: Install flutter_rust_bridge_codegen
-        run: cargo install flutter_rust_bridge_codegen --version 2.0.0
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0
       - run: flutter_rust_bridge_codegen generate
         working-directory: apps/xmp-flutter
       - uses: Swatinem/rust-cache@v2
