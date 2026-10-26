@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Download, FileText, MessageCircle, Paperclip, Phone, SendHorizontal, ShieldCheck, Video, ChevronLeft } from "lucide-react";
+import { Download, FileText, MessageCircle, Paperclip, Phone, SendHorizontal, ShieldCheck, Video, ChevronLeft, Plus, Smile } from "lucide-react";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { api, demoMode, Msg } from "../api";
 import { Xmp } from "../store";
@@ -37,6 +37,7 @@ export function ChatView({ xmp }: { xmp: Xmp }) {
   const peer = xmp.friends.find((f) => f.id === xmp.selected);
   const msgs = useMemo(() => (peer ? xmp.chats[peer.id]?.msgs ?? [] : []), [peer, xmp.chats]);
   const [text, setText] = useState("");
+  const [showMore, setShowMore] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -71,10 +72,6 @@ export function ChatView({ xmp }: { xmp: Xmp }) {
         <div className="min-w-0 flex-1">
           <div className="truncate text-base font-semibold leading-tight">{peer.display_name}</div>
           <div className="truncate text-xs text-dim">{isOnline ? "在线" : "离线"} · @{peer.username}</div>
-        </div>
-        <div className="flex items-center gap-0.5 sm:gap-1">
-          <button className="icon-btn" title="语音通话" disabled={!isOnline} onClick={() => void xmp.startCall(false)}><Phone className="h-5 w-5" /></button>
-          <button className="icon-btn" title="视频通话" disabled={!isOnline} onClick={() => void xmp.startCall(true)}><Video className="h-5 w-5" /></button>
         </div>
       </header>
 
@@ -114,20 +111,41 @@ export function ChatView({ xmp }: { xmp: Xmp }) {
       </div>
 
       <div className="px-4 pb-4 pt-2 sm:px-6 sm:pb-5">
-        <div className="glass flex items-end gap-1 rounded-[22px] border border-line p-1.5 shadow-lg shadow-black/5 transition focus-within:border-brand/60">
-          <button className="icon-btn shrink-0" title="发送文件" onClick={() => void attach()}><Paperclip className="h-5 w-5" /></button>
-          <textarea
-            ref={taRef}
-            rows={1}
-            className="max-h-36 min-h-10 flex-1 resize-none bg-transparent px-2 py-2.5 text-[15px] outline-none placeholder:text-dim/70"
-            placeholder="输入消息…"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}
-          />
-          <button onClick={send} disabled={!text.trim()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition active:scale-90 disabled:opacity-30" style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
-            <SendHorizontal className="h-[18px] w-[18px]" />
-          </button>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-end gap-2">
+            <button className="icon-btn mb-1.5 shrink-0" title="表情"><Smile className="h-6 w-6 text-dim" /></button>
+            <div className="glass flex min-h-[44px] flex-1 items-end rounded-[22px] border border-line bg-surface/50 p-1 shadow-sm transition focus-within:border-brand/60 focus-within:bg-surface">
+              <textarea
+                ref={taRef}
+                rows={1}
+                className="max-h-36 min-h-[36px] flex-1 resize-none bg-transparent px-3 py-2 text-[15px] outline-none placeholder:text-dim/70"
+                placeholder="输入消息…"
+                value={text}
+                onChange={(e) => { setText(e.target.value); if (showMore) setShowMore(false); }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}
+              />
+            </div>
+            <button className={`icon-btn mb-1.5 shrink-0 transition-transform ${showMore ? "rotate-45 text-brand" : "text-dim"}`} onClick={() => setShowMore(!showMore)} title="更多">
+              <Plus className="h-6 w-6" />
+            </button>
+          </div>
+
+          {showMore && (
+            <div className="grid animate-pop grid-cols-4 gap-4 pb-2 pt-1 sm:grid-cols-6">
+              <button className="flex flex-col items-center gap-2" onClick={() => { setShowMore(false); void attach(); }}>
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface shadow-sm transition hover:bg-raised active:scale-95 text-dim"><Paperclip className="h-6 w-6" /></div>
+                <span className="text-xs text-dim">文件</span>
+              </button>
+              <button className="flex flex-col items-center gap-2" disabled={!isOnline} onClick={() => { setShowMore(false); void xmp.startCall(false); }}>
+                <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-surface shadow-sm transition hover:bg-raised active:scale-95 ${isOnline ? "text-dim" : "opacity-40"}`}><Phone className="h-6 w-6" /></div>
+                <span className="text-xs text-dim">语音通话</span>
+              </button>
+              <button className="flex flex-col items-center gap-2" disabled={!isOnline} onClick={() => { setShowMore(false); void xmp.startCall(true); }}>
+                <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-surface shadow-sm transition hover:bg-raised active:scale-95 ${isOnline ? "text-dim" : "opacity-40"}`}><Video className="h-6 w-6" /></div>
+                <span className="text-xs text-dim">视频通话</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </main>

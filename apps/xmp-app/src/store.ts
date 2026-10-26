@@ -8,6 +8,7 @@ export interface Incoming { callId: string; peer: number; video: boolean }
 export interface ActiveCall {
   peer: number; video: boolean; status: "calling" | "connected";
   sas?: string; startedAt?: number; muted: boolean; camera: boolean; hd: boolean; engine: MediaEngine; stats?: CallStats;
+  minimized: boolean;
 }
 export interface Toast { id: number; text: string; kind: "info" | "error" }
 const errText = (e: unknown) => (typeof e === "string" ? e : e instanceof Error ? e.message : JSON.stringify(e));
@@ -166,7 +167,7 @@ export function useXmp() {
       toast(`无法访问麦克风/摄像头：${errText(e)}`, "error");
       return;
     }
-    setCall({ peer, video, status: "calling", muted: false, camera: video, hd: false, engine });
+    setCall({ peer, video, status: "calling", muted: false, camera: video, hd: false, engine, minimized: false });
     setSelected(peer);
     try {
       const info = await start(engine);
@@ -201,6 +202,8 @@ export function useXmp() {
   const hangup = useCallback(() => endCallLocal(true), [endCallLocal]);
   const toggleMute = useCallback(() => setCall((c) => { if (!c) return c; c.engine.setMuted(!c.muted); return { ...c, muted: !c.muted }; }), []);
   const toggleCamera = useCallback(() => setCall((c) => { if (!c || !c.video) return c; c.engine.setCamera(!c.camera); return { ...c, camera: !c.camera }; }), []);
+  const setMinimized = useCallback((m: boolean) => setCall((c) => (c ? { ...c, minimized: m } : c)), []);
+  const toggleMinimize = useCallback(() => setCall((c) => (c ? { ...c, minimized: !c.minimized } : c)), []);
 
   // poll call stats
   useEffect(() => {
@@ -228,6 +231,6 @@ export function useXmp() {
   void HD;
 
   return { me, friends, friendsOnly, requests, online, chats, selected, incoming, call, toasts, busy,
-    login, logout, selectPeer, sendText, sendFile, addFriend, acceptFriend, startCall, acceptIncoming, rejectIncoming, hangup, toggleMute, toggleCamera, toast };
+    login, logout, selectPeer, sendText, sendFile, addFriend, acceptFriend, startCall, acceptIncoming, rejectIncoming, hangup, toggleMute, toggleCamera, setMinimized, toggleMinimize, toast };
 }
 export type Xmp = ReturnType<typeof useXmp>;

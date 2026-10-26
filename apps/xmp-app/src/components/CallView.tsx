@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, PhoneOff, ShieldCheck, Video, VideoOff, Zap } from "lucide-react";
+import { Mic, MicOff, PhoneOff, ShieldCheck, Video, VideoOff, Zap, Minimize2, Maximize2 } from "lucide-react";
 import { Xmp } from "../store";
 import { Avatar } from "./Avatar";
 import { fmtDuration } from "../util";
@@ -25,6 +25,26 @@ export function CallView({ xmp }: { xmp: Xmp }) {
   const connected = call.status === "connected";
   const path = call.stats?.path;
 
+  if (call.minimized) {
+    return (
+      <div
+        className="fixed bottom-6 right-6 z-50 flex h-36 w-64 animate-pop cursor-pointer overflow-hidden rounded-2xl bg-black shadow-2xl transition-all hover:scale-[1.02] border border-white/10"
+        onClick={() => xmp.setMinimized(false)}
+      >
+        <div className="call-aurora absolute inset-0 opacity-50" />
+        <canvas ref={canvasRef} className={`absolute inset-0 h-full w-full object-cover ${call.video && connected && hasRemote ? "opacity-100" : "opacity-0"}`} />
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 backdrop-blur-[2px]">
+          {(!call.video || !connected || !hasRemote) && <Avatar name={name} size={48} ring />}
+          <div className="mt-2 text-xs font-medium text-white shadow-sm">{name}</div>
+          <div className="text-[10px] text-white/70">{connected ? fmtDuration(now - (call.startedAt ?? now)) : "正在呼叫…"}</div>
+        </div>
+        <button className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md transition hover:bg-black/60" onClick={(e) => { e.stopPropagation(); xmp.setMinimized(false); }}>
+          <Maximize2 className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="absolute inset-0 z-40 animate-fade overflow-hidden bg-black text-white">
       {/* backdrop: remote video or ambient gradient */}
@@ -48,6 +68,9 @@ export function CallView({ xmp }: { xmp: Xmp }) {
       {/* top bar */}
       <div className="absolute inset-x-0 top-0 flex items-start justify-between p-5">
         <div className="flex items-center gap-2.5">
+          <button onClick={() => xmp.setMinimized(true)} className="flex h-9 w-9 items-center justify-center rounded-full bg-black/35 backdrop-blur-xl transition hover:bg-black/50" title="最小化">
+            <Minimize2 className="h-5 w-5" />
+          </button>
           {connected && (
             <div className="flex items-center gap-2 rounded-full bg-black/35 px-3.5 py-1.5 text-xs font-medium backdrop-blur-xl">
               <Zap className={`h-3.5 w-3.5 ${path === "p2p" ? "text-good" : "text-amber-300"}`} fill="currentColor" />
