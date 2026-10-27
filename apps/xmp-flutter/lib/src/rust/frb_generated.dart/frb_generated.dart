@@ -517,7 +517,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           peer: dco_decode_i_64(raw[2]),
         );
       case 4:
-        return const XmpEvent_Disconnected();
+        return XmpEvent_Disconnected();
       default:
         throw Exception("unreachable");
     }
@@ -734,7 +734,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         var var_peer = sse_decode_i_64(deserializer);
         return XmpEvent_CallEnded(callId: var_callId, peer: var_peer);
       case 4:
-        return const XmpEvent_Disconnected();
+        return XmpEvent_Disconnected();
       default:
         throw UnimplementedError('');
     }

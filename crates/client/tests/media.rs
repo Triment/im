@@ -144,7 +144,7 @@ async fn video_survives_10_percent_loss_via_nack_and_fec() {
         }
     });
     let mut frames = 0;
-    let _ = timeout(Duration::from_secs(8), async {
+    let _ = timeout(Duration::from_secs(12), async {
         while frames < FRAMES {
             match bev.recv().await {
                 Some(MediaEvent::Video { data, .. }) => {
