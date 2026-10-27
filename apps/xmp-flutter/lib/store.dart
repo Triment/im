@@ -96,9 +96,11 @@ class XmpStore extends ChangeNotifier {
         final msgs = await api.sync(c.conv, 0);
         chats[c.peer] = Chat(convId: c.conv, msgs: msgs, unread: 0);
       }
-      final first = fs.firstWhere((f) => f.status == FriendStatus.friends,
-          orElse: () => fs.first);
-      selected = first.id;
+      if (fs.isNotEmpty) {
+        final first = fs.firstWhere((f) => f.status == FriendStatus.friends,
+            orElse: () => fs.first);
+        selected = first.id;
+      }
       busy = false;
       notifyListeners();
       return true;
@@ -174,6 +176,56 @@ class XmpStore extends ChangeNotifier {
         return c;
       });
       toast("发送失败：$e", kind: "error");
+    }
+  }
+
+  Future<void> sendFile(String path) async {
+    final peer = selected;
+    if (peer == null) return;
+    try {
+      await api.sendFile(peer, path);
+      toast('文件已发送');
+    } catch (e) {
+      toast('文件发送失败：$e', kind: 'error');
+    }
+  }
+
+  Future<void> startCall(bool video) async {
+    final peer = selected;
+    if (peer == null || call != null) return;
+    try {
+      final result = await api.callStart(peer, video);
+      call = ActiveCall(peer: peer, video: video, status: CallStatus.connected,
+          sas: result['sas'] as String?);
+      notifyListeners();
+    } catch (e) {
+      toast('通话失败：$e', kind: 'error');
+    }
+  }
+
+  Future<void> acceptIncoming() async {
+    final request = incoming;
+    if (request == null) return;
+    try {
+      final result = await api.callAccept(request.callId, request.peer, request.video);
+      incoming = null;
+      call = ActiveCall(peer: request.peer, video: request.video,
+          status: CallStatus.connected, sas: result['sas'] as String?);
+      notifyListeners();
+    } catch (e) {
+      toast('接听失败：$e', kind: 'error');
+    }
+  }
+
+  Future<void> rejectIncoming() async {
+    final request = incoming;
+    if (request == null) return;
+    incoming = null;
+    notifyListeners();
+    try {
+      await api.callReject(request.callId, request.peer);
+    } catch (e) {
+      toast('拒接失败：$e', kind: 'error');
     }
   }
 

@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex as StdMutex, atomic::{AtomicBool, AtomicU32}};
 use tokio::sync::Mutex;
 use xmp_client::{Client, ConnectOpts, Auth, session::MediaSession, call::Call};
-use xmp_codec::{audio::AudioEncoder, video::H264Encoder};
+use xmp_codec::{audio::{AudioConfig, AudioEncoder}, video::H264Encoder};
 use xmp_proto::control::{StoredMessage, msg_kind, FileRef, sig, Msg};
 use serde::{Serialize, Deserialize};
 use anyhow::{Result, anyhow};
@@ -77,6 +77,9 @@ pub struct MeDto {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CallInfoDto {
+    pub call_id: String,
+    pub peer: i64,
+    pub video: bool,
     pub sas: String,
 }
 
@@ -176,10 +179,99 @@ pub async fn get_friends() -> Result<Vec<FriendDto>> {
     }).collect())
 }
 
+pub async fn friend_request(username: String) -> Result<()> {
+    get_client().await?.friend_request(&username).await.map_err(|e| anyhow!(friendly(e)))
+}
+
+pub async fn friend_accept(user_id: i64) -> Result<()> {
+    get_client().await?.friend_accept(user_id).await.map_err(|e| anyhow!(friendly(e)))
+}
+
+pub async fn get_conversations() -> Result<Vec<ConvDto>> {
+    let convs = get_client().await?.conversations().await.map_err(|e| anyhow!(friendly(e)))?;
+    Ok(convs.into_iter().map(|c| ConvDto { conv: c.conv_id, peer: c.peer_id, last_seq: c.last_seq }).collect())
+}
+
+pub async fn sync_messages(conv: i64, after: i64) -> Result<Vec<MsgDto>> {
+    let messages = get_client().await?.sync(conv, after, 200).await.map_err(|e| anyhow!(friendly(e)))?;
+    Ok(messages.into_iter().map(|m| msg_dto(&m)).collect())
+}
+
 pub async fn send_text(to: i64, text: String) -> Result<ConvDto> {
     let client = get_client().await?;
     let (conv, seq, _ts) = client.send_text(to, &text).await.map_err(|e| anyhow!(friendly(e)))?;
     Ok(ConvDto { conv, peer: to, last_seq: seq })
+}
+
+pub async fn send_file(to: i64, path: String) -> Result<FileDto> {
+    let file = get_client().await?.send_file(to, std::path::Path::new(&path)).await.map_err(|e| anyhow!(friendly(e)))?;
+    Ok(FileDto { name: file.name, size: file.size, hash: hex(&file.hash) })
+}
+
+pub async fn download_file(hash: String, size: u64, name: String, dest: String) -> Result<()> {
+    let bytes = hex::decode(&hash).map_err(|_| anyhow!("文件哈希无效"))?;
+    let hash: [u8; 32] = bytes.try_into().map_err(|_| anyhow!("文件哈希无效"))?;
+    let file = FileRef { name, size, hash };
+    get_client().await?.download_file(&file, std::path::Path::new(&dest)).await.map_err(|e| anyhow!(friendly(e)))
+}
+
+pub async fn call_start(peer: i64, video: bool) -> Result<CallInfoDto> {
+    let call = get_client().await?.start_call(peer, video).await.map_err(|e| anyhow!(friendly(e)))?;
+    let info = CallInfoDto { call_id: call.call_id.to_string(), peer: call.peer, video: call.video, sas: call.sas.clone() };
+    let media = call.media.clone();
+    let active = ActiveCall {
+        call: Mutex::new(Some(call)),
+        media,
+        audio_enc: StdMutex::new(AudioEncoder::new(AudioConfig::default()).map_err(|e| anyhow!(e.to_string()))?),
+        video_enc: StdMutex::new(None),
+        target_bps: Arc::new(AtomicU32::new(0)),
+        cur_bps: AtomicU32::new(0),
+        force_key: Arc::new(AtomicBool::new(false)),
+        t0: std::time::Instant::now(),
+    };
+    *STATE.call.lock().unwrap() = Some(Arc::new(active));
+    Ok(info)
+}
+
+pub async fn call_accept(call_id: String, peer: i64, video: bool) -> Result<CallInfoDto> {
+    let id = call_id.parse::<u64>().map_err(|_| anyhow!("通话 ID 无效"))?;
+    let call = get_client().await?.accept_call(id, peer, video).await.map_err(|e| anyhow!(friendly(e)))?;
+    let info = CallInfoDto { call_id, peer: call.peer, video: call.video, sas: call.sas.clone() };
+    let media = call.media.clone();
+    *STATE.call.lock().unwrap() = Some(Arc::new(ActiveCall {
+        call: Mutex::new(Some(call)),
+        media,
+        audio_enc: StdMutex::new(AudioEncoder::new(AudioConfig::default()).map_err(|e| anyhow!(e.to_string()))?),
+        video_enc: StdMutex::new(None),
+        target_bps: Arc::new(AtomicU32::new(0)),
+        cur_bps: AtomicU32::new(0),
+        force_key: Arc::new(AtomicBool::new(false)),
+        t0: std::time::Instant::now(),
+    }));
+    Ok(info)
+}
+
+pub async fn call_reject(call_id: String, peer: i64) -> Result<()> {
+    let id = call_id.parse::<u64>().map_err(|_| anyhow!("通话 ID 无效"))?;
+    get_client().await?.reject_call(id, peer).await.map_err(|e| anyhow!(friendly(e)))
+}
+
+pub async fn call_hangup() -> Result<()> {
+    hangup_inner().await;
+    Ok(())
+}
+
+pub async fn call_stats() -> Result<CallStatsDto> {
+    let active = STATE.call.lock().unwrap().clone().ok_or_else(|| anyhow!("当前没有通话"))?;
+    let stats = active.media.stats();
+    Ok(CallStatsDto {
+        path: format!("{:?}", active.media.path()).to_lowercase(),
+        video_target_kbps: stats.video_target_bps / 1000,
+        tx: stats.tx_packets,
+        rx: stats.rx_packets,
+        retransmits: stats.retransmits,
+        fec_recovered: stats.fec_recovered,
+    })
 }
 
 // ... Additional functions for calls, files etc would go here ...

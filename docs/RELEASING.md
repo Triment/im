@@ -64,3 +64,61 @@ This is enforced twice: the workflow passes `--target aarch64 armv7`, and the de
 * Workflow syntax passes `actionlint`; lockfiles pass `cargo metadata --locked`.
 * **The workflows have never run on GitHub.** Expect a first-run fix or two, most likely in the Windows/macOS native builds (OpenH264 needs NASM, Opus needs CMake) and in the Android job, which cross-compiles those C/C++ libraries with the NDK and is therefore marked `continue-on-error`.
 * The Android Gradle signing block and manifest permissions were added to a CLI-generated project but never built here (no Android SDK / Gradle download in the sandbox).
+# XMP Release Guide
+
+## Flutter native assets
+
+The Flutter client is built through `flutter_rust_bridge` native assets. The
+GitHub workflows generate the bindings and build the Rust library for the
+target platform. The Android Gradle task copies `libc++_shared.so` from the
+selected NDK into every supported ABI, which avoids the runtime error:
+`libc++_shared.so not found`.
+
+Android releases are published as a zip containing split APKs for arm64,
+armv7, x86_64, and x86. Desktop releases are built separately for macOS
+Apple Silicon, macOS Intel, Linux x86_64, and Windows x86_64.
+
+## Android signing
+
+The release workflow can publish a signed Android build when these repository
+secrets are configured:
+
+- `ANDROID_KEYSTORE_BASE64`: base64-encoded `.jks` or `.keystore` file
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+
+Example preparation command:
+
+```sh
+base64 -i release.jks | pbcopy       # macOS
+base64 -w 0 release.jks              # Linux
+```
+
+Paste the resulting value into the GitHub Actions secret. The workflow writes
+the keystore only to the runner's temporary directory and passes its path to
+Gradle through `ANDROID_KEYSTORE_PATH`. When the secrets are absent, the
+workflow uses the debug key so unsigned/dev artifacts can still be tested, but
+those APKs must not be distributed as production releases.
+
+The signing key must remain stable across updates. Android will reject an
+upgrade if a new release is signed by a different key. Keep an encrypted backup
+of the keystore and its passwords outside GitHub.
+
+## Tags and artifacts
+
+Push a tag such as `v0.2.0` to create a draft release. The workflow uploads
+server binaries, split Android APKs, macOS arm64/x86_64 archives, Linux and
+Windows archives, then publishes `SHA256SUMS.txt`. `workflow_dispatch` runs the
+same builds without publishing a release.
+
+Local Android verification:
+
+```sh
+flutter clean
+flutter pub get
+flutter run -d <android-device>
+```
+
+The app's Gradle task resolves the configured NDK and packages the C++ runtime;
+no manually copied `.so` file is required under `android/app/src/main/jniLibs`.

@@ -17,7 +17,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  NDK_VERSION: "27.0.12077973"
+  NDK_VERSION: "28.2.13676358"
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -190,10 +190,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { target: android, os: ubuntu-latest,  out: XMP-android.apk }
-          - { target: macos,   os: macos-latest,   out: XMP-macos.zip }
-          - { target: windows, os: windows-latest, out: XMP-windows.zip }
-          - { target: linux,   os: ubuntu-latest,  out: XMP-linux.tar.gz }
+          - { target: android, os: ubuntu-latest,  name: android }
+          - { target: macos,   os: macos-14,       name: macos-arm64 }
+          - { target: macos,   os: macos-13,       name: macos-x86_64 }
+          - { target: windows, os: windows-latest, name: windows-x86_64 }
+          - { target: linux,   os: ubuntu-latest,  name: linux-x86_64 }
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -237,6 +238,28 @@ jobs:
           echo "ANDROID_NDK_HOME=${SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=${SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
 
+      - name: Configure Android signing
+        if: matrix.target == 'android'
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [[ -z "$KEYSTORE_B64" ]]; then
+            echo "Android signing secrets are not configured; using the debug key."
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/android-signing"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/android-signing/release.jks"
+          {
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/android-signing/release.jks"
+            echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -258,7 +281,12 @@ jobs:
 
       - name: Build Flutter app
         working-directory: apps/xmp-flutter
-        run: flutter build ${{ matrix.target }} --release
+        run: |
+          if [[ "${{ matrix.target }}" == "android" ]]; then
+            flutter build apk --release --split-per-abi
+          else
+            flutter build ${{ matrix.target }} --release
+          fi
 
       - name: Package Windows
         if: matrix.target == 'windows'
@@ -286,14 +314,18 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ matrix.target }}" == "android" ]]; then
-            cp apps/xmp-flutter/build/app/outputs/flutter-apk/app-release.apk XMP-android.apk
-            echo "file=XMP-android.apk" >> "$GITHUB_OUTPUT"
+            mkdir -p XMP-android
+            cp apps/xmp-flutter/build/app/outputs/flutter-apk/app-*-release.apk XMP-android/
+            (cd XMP-android && sha256sum *.apk > SHA256SUMS.txt)
+            zip -r XMP-android-${{ needs.prepare.outputs.version }}.zip XMP-android >/dev/null
+            echo "file=XMP-android-${{ needs.prepare.outputs.version }}.zip" >> "$GITHUB_OUTPUT"
           elif [[ "${{ matrix.target }}" == "windows" ]]; then
-            echo "file=XMP-windows.zip" >> "$GITHUB_OUTPUT"
+          echo "file=XMP-windows.zip" >> "$GITHUB_OUTPUT"
           elif [[ "${{ matrix.target }}" == "linux" ]]; then
             echo "file=XMP-linux.tar.gz" >> "$GITHUB_OUTPUT"
           elif [[ "${{ matrix.target }}" == "macos" ]]; then
-            echo "file=XMP-macos.zip" >> "$GITHUB_OUTPUT"
+          mv XMP-macos.zip XMP-macos-${{ matrix.name }}.zip
+          echo "file=XMP-macos-${{ matrix.name }}.zip" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload artifact

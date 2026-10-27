@@ -9,7 +9,7 @@ import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'api.freezed.dart';
 
 // These functions are ignored because they are not marked as `pub`: `event_to_dto`, `friendly`, `get_client`, `hangup_inner`, `hex`, `msg_dto`, `normalize_cert`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `ActiveCall`, `CallInfoDto`, `CallStatsDto`, `RUNTIME`, `STATE`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `ActiveCall`, `RUNTIME`, `STATE`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `deref`, `deref`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `initialize`, `initialize`
 
 Future<void> initApp() => RustLib.instance.api.crateApiInitApp();
@@ -39,13 +39,123 @@ Future<void> logout() => RustLib.instance.api.crateApiLogout();
 Future<List<FriendDto>> getFriends() =>
     RustLib.instance.api.crateApiGetFriends();
 
+Future<void> friendRequest({required String username}) =>
+    RustLib.instance.api.crateApiFriendRequest(username: username);
+
+Future<void> friendAccept({required PlatformInt64 userId}) =>
+    RustLib.instance.api.crateApiFriendAccept(userId: userId);
+
+Future<List<ConvDto>> getConversations() =>
+    RustLib.instance.api.crateApiGetConversations();
+
+Future<List<MsgDto>> syncMessages(
+        {required PlatformInt64 conv, required PlatformInt64 after}) =>
+    RustLib.instance.api.crateApiSyncMessages(conv: conv, after: after);
+
 Future<ConvDto> sendText({required PlatformInt64 to, required String text}) =>
     RustLib.instance.api.crateApiSendText(to: to, text: text);
+
+Future<FileDto> sendFile({required PlatformInt64 to, required String path}) =>
+    RustLib.instance.api.crateApiSendFile(to: to, path: path);
+
+Future<void> downloadFile(
+        {required String hash,
+        required BigInt size,
+        required String name,
+        required String dest}) =>
+    RustLib.instance.api
+        .crateApiDownloadFile(hash: hash, size: size, name: name, dest: dest);
+
+Future<CallInfoDto> callStart(
+        {required PlatformInt64 peer, required bool video}) =>
+    RustLib.instance.api.crateApiCallStart(peer: peer, video: video);
+
+Future<CallInfoDto> callAccept(
+        {required String callId,
+        required PlatformInt64 peer,
+        required bool video}) =>
+    RustLib.instance.api
+        .crateApiCallAccept(callId: callId, peer: peer, video: video);
+
+Future<void> callReject(
+        {required String callId, required PlatformInt64 peer}) =>
+    RustLib.instance.api.crateApiCallReject(callId: callId, peer: peer);
+
+Future<void> callHangup() => RustLib.instance.api.crateApiCallHangup();
+
+Future<CallStatsDto> callStats() => RustLib.instance.api.crateApiCallStats();
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<AppState>>
 abstract class AppState implements RustOpaqueInterface {
   static Future<AppState> default_() =>
       RustLib.instance.api.crateApiAppStateDefault();
+}
+
+class CallInfoDto {
+  final String callId;
+  final PlatformInt64 peer;
+  final bool video;
+  final String sas;
+
+  const CallInfoDto({
+    required this.callId,
+    required this.peer,
+    required this.video,
+    required this.sas,
+  });
+
+  @override
+  int get hashCode =>
+      callId.hashCode ^ peer.hashCode ^ video.hashCode ^ sas.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CallInfoDto &&
+          runtimeType == other.runtimeType &&
+          callId == other.callId &&
+          peer == other.peer &&
+          video == other.video &&
+          sas == other.sas;
+}
+
+class CallStatsDto {
+  final String path;
+  final int videoTargetKbps;
+  final BigInt tx;
+  final BigInt rx;
+  final BigInt retransmits;
+  final BigInt fecRecovered;
+
+  const CallStatsDto({
+    required this.path,
+    required this.videoTargetKbps,
+    required this.tx,
+    required this.rx,
+    required this.retransmits,
+    required this.fecRecovered,
+  });
+
+  @override
+  int get hashCode =>
+      path.hashCode ^
+      videoTargetKbps.hashCode ^
+      tx.hashCode ^
+      rx.hashCode ^
+      retransmits.hashCode ^
+      fecRecovered.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CallStatsDto &&
+          runtimeType == other.runtimeType &&
+          path == other.path &&
+          videoTargetKbps == other.videoTargetKbps &&
+          tx == other.tx &&
+          rx == other.rx &&
+          retransmits == other.retransmits &&
+          fecRecovered == other.fecRecovered;
 }
 
 class ConvDto {

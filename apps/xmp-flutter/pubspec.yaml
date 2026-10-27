@@ -21,6 +21,7 @@ dependencies:
   flutter_rust_bridge: 2.13.0
   freezed_annotation: ^3.1.0
   flutter_rust_bridge_hooks: 2.13.0
+  shadcn_flutter: ^0.0.55
 
 dev_dependencies:
   flutter_test:
@@ -28,6 +29,13 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   freezed: ^4.0.3
   build_runner: ^2.17.1
-
+  flutter_launcher_icons: ^0.14.0
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#0E7C7B"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  remove_alpha_ios: true
 flutter:
   uses-material-design: true

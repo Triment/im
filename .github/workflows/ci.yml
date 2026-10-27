@@ -106,3 +106,46 @@ jobs:
       - name: Run Flutter tests
         working-directory: apps/xmp-flutter
         run: flutter test
+
+  flutter-native-assets:
+    name: Flutter native assets (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: android, os: ubuntu-22.04 }
+          - { target: linux, os: ubuntu-22.04 }
+          - { target: macos, os: macos-14 }
+          - { target: windows, os: windows-2022 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - uses: android-actions/setup-android@v3
+        if: matrix.target == 'android'
+      - name: Install Android NDK
+        if: matrix.target == 'android'
+        run: sdkmanager "ndk;28.2.13676358"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libopus-dev libdbus-1-dev nasm g++
+      - name: Install FRB codegen
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+      - name: Install dependencies
+        working-directory: apps/xmp-flutter
+        run: flutter pub get
+      - name: Generate bindings
+        working-directory: apps/xmp-flutter
+        run: flutter_rust_bridge_codegen generate
+      - name: Build native asset target
+        working-directory: apps/xmp-flutter
+        run: |
+          if [[ "${{ matrix.target }}" == "android" ]]; then
+            flutter build apk --debug
+          else
+            flutter build ${{ matrix.target }} --debug
+          fi

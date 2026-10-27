@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../store.dart';
 import '../widgets/sidebar.dart';
@@ -12,20 +12,15 @@ class HomeScreen extends StatelessWidget {
     final store = context.watch<XmpStore>();
     final isMobile = MediaQuery.of(context).size.width < 600;
 
-    return Scaffold(
-      body: Row(
+    return Row(
         children: [
           if (!isMobile || store.selected == null)
             const SizedBox(
               width: 320,
               child: Sidebar(),
             ),
-          if (!isMobile || store.selected != null)
-            const Expanded(
-              child: ChatView(),
-            ),
+          if (!isMobile || store.selected != null) const Expanded(child: ChatView()),
         ],
-      ),
     );
   }
 }

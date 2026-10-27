@@ -50,6 +50,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MsgDto dco_decode_box_autoadd_msg_dto(dynamic raw);
 
   @protected
+  CallInfoDto dco_decode_call_info_dto(dynamic raw);
+
+  @protected
+  CallStatsDto dco_decode_call_stats_dto(dynamic raw);
+
+  @protected
   ConvDto dco_decode_conv_dto(dynamic raw);
 
   @protected
@@ -62,7 +68,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
+  List<ConvDto> dco_decode_list_conv_dto(dynamic raw);
+
+  @protected
   List<FriendDto> dco_decode_list_friend_dto(dynamic raw);
+
+  @protected
+  List<MsgDto> dco_decode_list_msg_dto(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
@@ -78,6 +90,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   FileDto? dco_decode_opt_box_autoadd_file_dto(dynamic raw);
+
+  @protected
+  int dco_decode_u_32(dynamic raw);
 
   @protected
   BigInt dco_decode_u_64(dynamic raw);
@@ -124,6 +139,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MsgDto sse_decode_box_autoadd_msg_dto(SseDeserializer deserializer);
 
   @protected
+  CallInfoDto sse_decode_call_info_dto(SseDeserializer deserializer);
+
+  @protected
+  CallStatsDto sse_decode_call_stats_dto(SseDeserializer deserializer);
+
+  @protected
   ConvDto sse_decode_conv_dto(SseDeserializer deserializer);
 
   @protected
@@ -136,7 +157,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
+  List<ConvDto> sse_decode_list_conv_dto(SseDeserializer deserializer);
+
+  @protected
   List<FriendDto> sse_decode_list_friend_dto(SseDeserializer deserializer);
+
+  @protected
+  List<MsgDto> sse_decode_list_msg_dto(SseDeserializer deserializer);
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
@@ -152,6 +179,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   FileDto? sse_decode_opt_box_autoadd_file_dto(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer);
 
   @protected
   BigInt sse_decode_u_64(SseDeserializer deserializer);
@@ -202,6 +232,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_msg_dto(MsgDto self, SseSerializer serializer);
 
   @protected
+  void sse_encode_call_info_dto(CallInfoDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_call_stats_dto(CallStatsDto self, SseSerializer serializer);
+
+  @protected
   void sse_encode_conv_dto(ConvDto self, SseSerializer serializer);
 
   @protected
@@ -214,8 +250,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_conv_dto(List<ConvDto> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_friend_dto(
       List<FriendDto> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_msg_dto(List<MsgDto> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_u_8_strict(
@@ -233,6 +275,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_file_dto(
       FileDto? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_64(BigInt self, SseSerializer serializer);

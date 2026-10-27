@@ -1,8 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
-import '../store.dart';
+import 'package:provider/provider.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
+
 import '../models.dart';
+import '../store.dart';
 
 class ChatView extends StatefulWidget {
   const ChatView({super.key});
@@ -26,14 +29,9 @@ class _ChatViewState extends State<ChatView> {
   Widget build(BuildContext context) {
     final store = context.watch<XmpStore>();
     final peer = store.selected;
-    if (peer == null) {
-      return const Center(child: Text('选择一个联系人开始聊天'));
-    }
-
+    if (peer == null) return const Center(child: Text('选择一个联系人开始聊天'));
     final friend = store.friends.firstWhere((f) => f.id == peer);
-    final chat = store.chats[peer];
-    final msgs = chat?.msgs ?? [];
-
+    final msgs = store.chats[peer]?.msgs ?? <Msg>[];
     return Column(
       children: [
         _buildHeader(context, friend, store.online[peer] ?? false),
@@ -44,8 +42,7 @@ class _ChatViewState extends State<ChatView> {
             itemCount: msgs.length,
             itemBuilder: (context, index) {
               final msg = msgs[index];
-              final isMe = msg.sender == store.me?['user_id'];
-              return _buildMessage(context, msg, isMe);
+              return _buildMessage(context, msg, msg.sender == store.me?['user_id']);
             },
           ),
         ),
@@ -55,55 +52,38 @@ class _ChatViewState extends State<ChatView> {
   }
 
   Widget _buildHeader(BuildContext context, Friend friend, bool isOnline) {
-    return AppBar(
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: shad.Theme.of(context).colorScheme.border))),
+      child: Row(
         children: [
-          Text(friend.displayName),
-          Text(
-            isOnline ? '在线' : '离线',
-            style: const TextStyle(fontSize: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(friend.displayName),
+              Text(isOnline ? '在线' : '离线', style: TextStyle(fontSize: 12, color: shad.Theme.of(context).colorScheme.mutedForeground)),
+            ]),
           ),
+          shad.IconButton(variance: shad.ButtonVariance.ghost, icon: const Icon(shad.LucideIcons.phone), onPressed: () => context.read<XmpStore>().startCall(false)),
+          shad.IconButton(variance: shad.ButtonVariance.ghost, icon: const Icon(shad.LucideIcons.video), onPressed: () => context.read<XmpStore>().startCall(true)),
         ],
       ),
-      actions: [
-        IconButton(icon: const Icon(Icons.call), onPressed: () {}),
-        IconButton(icon: const Icon(Icons.videocam), onPressed: () {}),
-      ],
     );
   }
 
   Widget _buildMessage(BuildContext context, Msg msg, bool isMe) {
+    final background = isMe ? shad.Theme.of(context).colorScheme.primary : shad.Theme.of(context).colorScheme.muted;
+    final foreground = isMe ? shad.Theme.of(context).colorScheme.primaryForeground : shad.Theme.of(context).colorScheme.foreground;
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isMe
-              ? Theme.of(context).primaryColor
-              : Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              msg.text ?? '',
-              style: TextStyle(
-                color: isMe ? Colors.white : null,
-              ),
-            ),
+      child: shad.Card(
+        theme: shad.CardTheme(fillColor: background, filled: true),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(msg.text ?? msg.file?.name ?? '文件', style: TextStyle(color: foreground)),
             const SizedBox(height: 4),
-            Text(
-              DateFormat('HH:mm')
-                  .format(DateTime.fromMillisecondsSinceEpoch(msg.ts)),
-              style: TextStyle(
-                fontSize: 10,
-                color: isMe ? Colors.white70 : Colors.grey,
-              ),
-            ),
-          ],
+            Text(DateFormat('HH:mm').format(DateTime.fromMillisecondsSinceEpoch(msg.ts)), style: TextStyle(fontSize: 10, color: foreground.withValues(alpha: .7))),
+          ]),
         ),
       ),
     );
@@ -111,21 +91,21 @@ class _ChatViewState extends State<ChatView> {
 
   Widget _buildInput(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.all(8),
       child: Row(
         children: [
-          IconButton(icon: const Icon(Icons.attach_file), onPressed: () {}),
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              decoration: const InputDecoration(
-                hintText: '输入消息...',
-                border: OutlineInputBorder(),
-              ),
-              onSubmitted: (_) => _send(),
-            ),
+          shad.IconButton(
+            variance: shad.ButtonVariance.ghost,
+            icon: const Icon(shad.LucideIcons.paperclip),
+            onPressed: () async {
+              final result = await FilePicker.pickFiles();
+              final path = result.isEmpty ? null : result.single.path;
+              if (path != null && context.mounted) await context.read<XmpStore>().sendFile(path);
+            },
           ),
-          IconButton(icon: const Icon(Icons.send), onPressed: _send),
+          Expanded(child: shad.TextField(controller: _controller, placeholder: const Text('输入消息...'), onSubmitted: (_) => _send())),
+          const SizedBox(width: 8),
+          shad.IconButton(variance: shad.ButtonVariance.primary, icon: const Icon(shad.LucideIcons.send), onPressed: _send),
         ],
       ),
     );

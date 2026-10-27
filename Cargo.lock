@@ -2717,6 +2717,7 @@ dependencies = [
  "anyhow",
  "base64",
  "flutter_rust_bridge",
+ "hex",
  "keyring",
  "lazy_static",
  "serde",

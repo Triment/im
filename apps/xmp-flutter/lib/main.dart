@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 import 'api.dart';
 import 'store.dart';
 import 'screens/home_screen.dart';
@@ -28,9 +29,8 @@ Future<void> main() async {
     debugPrintStack(stackTrace: stack);
 
     runApp(
-      const MaterialApp(
-        home: Scaffold(
-          body: Center(
+      const shad.ShadcnApp(
+        home: Center(
             child: Padding(
               padding: EdgeInsets.all(24),
               child: Text(
@@ -39,7 +39,6 @@ Future<void> main() async {
               ),
             ),
           ),
-        ),
       ),
     );
   }
@@ -50,22 +49,11 @@ class XmpApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return shad.ShadcnApp(
       title: 'XMP',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      theme: const shad.ThemeData(colorScheme: shad.ColorSchemes.lightZinc),
+      darkTheme: const shad.ThemeData(colorScheme: shad.ColorSchemes.darkZinc),
+      themeMode: shad.ThemeMode.system,
       home: const MainNavigator(),
     );
   }
@@ -81,6 +69,31 @@ class MainNavigator extends StatelessWidget {
     return Stack(
       children: [
         store.me == null ? const LoginScreen() : const HomeScreen(),
+        if (store.incoming != null)
+          Positioned(
+            top: 24,
+            left: 24,
+            right: 24,
+            child: shad.Card(
+              child: Row(
+                children: [
+                  Icon(store.incoming!.video ? shad.LucideIcons.video : shad.LucideIcons.phone),
+                  const SizedBox(width: 12),
+                  const Expanded(child: Text('收到来电')),
+                  shad.IconButton(
+                    variance: shad.ButtonVariance.ghost,
+                    icon: const Icon(shad.LucideIcons.phone),
+                    onPressed: store.acceptIncoming,
+                  ),
+                  shad.IconButton(
+                    variance: shad.ButtonVariance.ghost,
+                    icon: const Icon(shad.LucideIcons.phoneOff),
+                    onPressed: store.rejectIncoming,
+                  ),
+                ],
+              ),
+            ),
+          ),
         Toasts(toasts: store.toasts),
       ],
     );

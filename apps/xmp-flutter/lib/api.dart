@@ -119,36 +119,85 @@ class RustApi implements XmpApi {
     return {
       'conv': res.conv,
       'seq': res.lastSeq,
-      'ts': DateTime.now().millisecondsSinceEpoch
+      'ts': DateTime.now().millisecondsSinceEpoch,
     };
   }
 
-  // ... Other methods would similarly call rust.functions ...
+  @override
+  Future<void> friendRequest(String username) =>
+      rust.friendRequest(username: username);
 
   @override
-  Future<void> friendRequest(String username) async {}
+  Future<void> friendAccept(int userId) =>
+      rust.friendAccept(userId: userId);
+
   @override
-  Future<void> friendAccept(int userId) async {}
+  Future<List<Conv>> conversations() async =>
+      (await rust.getConversations()).map((c) => Conv(
+            conv: c.conv.toInt(),
+            peer: c.peer.toInt(),
+            lastSeq: c.lastSeq.toInt(),
+          )).toList();
+
   @override
-  Future<List<Conv>> conversations() async => [];
+  Future<List<Msg>> sync(int conv, int after) async =>
+      (await rust.syncMessages(conv: conv, after: after)).map(_msg).toList();
+
   @override
-  Future<List<Msg>> sync(int conv, int after) async => [];
+  Future<void> sendFile(int to, String path) async {
+    await rust.sendFile(to: to, path: path);
+  }
+
   @override
-  Future<void> sendFile(int to, String path) async {}
+  Future<void> downloadFile(String hash, int size, String dest) async {
+    await rust.downloadFile(
+        hash: hash, size: BigInt.from(size), name: 'download', dest: dest);
+  }
+
   @override
-  Future<void> downloadFile(String hash, int size, String dest) async {}
-  @override
-  Future<Map<String, dynamic>> callStart(int peer, bool video) async => {};
+  Future<Map<String, dynamic>> callStart(int peer, bool video) async {
+    final c = await rust.callStart(peer: peer, video: video);
+    return {'call_id': c.callId, 'peer': c.peer.toInt(), 'video': c.video, 'sas': c.sas};
+  }
+
   @override
   Future<Map<String, dynamic>> callAccept(
-          String callId, int peer, bool video) async =>
-      {};
+          String callId, int peer, bool video) async {
+    final c = await rust.callAccept(callId: callId, peer: peer, video: video);
+    return {'call_id': c.callId, 'peer': c.peer.toInt(), 'video': c.video, 'sas': c.sas};
+  }
+
   @override
-  Future<void> callReject(String callId, int peer) async {}
+  Future<void> callReject(String callId, int peer) =>
+      rust.callReject(callId: callId, peer: peer);
+
   @override
-  Future<void> callHangup() async {}
+  Future<void> callHangup() => rust.callHangup();
+
   @override
-  Future<Map<String, dynamic>> callStats() async => {};
+  Future<Map<String, dynamic>> callStats() async {
+    final s = await rust.callStats();
+    return {
+      'path': s.path,
+      'video_target_kbps': s.videoTargetKbps,
+      'tx': s.tx,
+      'rx': s.rx,
+      'retransmits': s.retransmits,
+      'fec_recovered': s.fecRecovered,
+    };
+  }
+
+  static Msg _msg(rust.MsgDto m) => Msg(
+        conv: m.conv.toInt(),
+        seq: m.seq.toInt(),
+        sender: m.sender.toInt(),
+        kind: m.kind,
+        ts: m.ts.toInt(),
+        text: m.text,
+        file: m.file == null
+            ? null
+            : FileRef(name: m.file!.name, size: m.file!.size.toInt(), hash: m.file!.hash),
+      );
 }
 
 class DemoApi implements XmpApi {
