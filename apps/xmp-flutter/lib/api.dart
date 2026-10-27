@@ -19,7 +19,7 @@ abstract class XmpApi {
   Future<void> callReject(String callId, int peer);
   Future<void> callHangup();
   Future<Map<String, dynamic>> callStats();
-  
+
   Stream<Map<String, dynamic>> get onEvent;
 }
 
@@ -90,31 +90,41 @@ class RustApi implements XmpApi {
   @override
   Future<List<Friend>> friends() async {
     final fs = await rust.getFriends();
-    return fs.map((f) => Friend(
-      id: f.id,
-      username: f.username,
-      displayName: f.displayName,
-      status: _parseStatus(f.status),
-    )).toList();
+    return fs
+        .map((f) => Friend(
+              id: f.id,
+              username: f.username,
+              displayName: f.displayName,
+              status: _parseStatus(f.status),
+            ))
+        .toList();
   }
 
   static FriendStatus _parseStatus(String status) {
     switch (status) {
-      case 'sent': return FriendStatus.sent;
-      case 'received': return FriendStatus.received;
-      case 'friends': return FriendStatus.friends;
-      default: return FriendStatus.friends;
+      case 'sent':
+        return FriendStatus.sent;
+      case 'received':
+        return FriendStatus.received;
+      case 'friends':
+        return FriendStatus.friends;
+      default:
+        return FriendStatus.friends;
     }
   }
 
   @override
   Future<Map<String, dynamic>> sendText(int to, String text) async {
     final res = await rust.sendText(to: to, text: text);
-    return {'conv': res.conv, 'seq': res.lastSeq, 'ts': DateTime.now().millisecondsSinceEpoch};
+    return {
+      'conv': res.conv,
+      'seq': res.lastSeq,
+      'ts': DateTime.now().millisecondsSinceEpoch
+    };
   }
 
   // ... Other methods would similarly call rust.functions ...
-  
+
   @override
   Future<void> friendRequest(String username) async {}
   @override
@@ -130,7 +140,9 @@ class RustApi implements XmpApi {
   @override
   Future<Map<String, dynamic>> callStart(int peer, bool video) async => {};
   @override
-  Future<Map<String, dynamic>> callAccept(String callId, int peer, bool video) async => {};
+  Future<Map<String, dynamic>> callAccept(
+          String callId, int peer, bool video) async =>
+      {};
   @override
   Future<void> callReject(String callId, int peer) async {}
   @override
@@ -149,12 +161,12 @@ class DemoApi implements XmpApi {
   Future<Map<String, dynamic>> connect(Map<String, dynamic> args) async {
     await Future.delayed(const Duration(milliseconds: 350));
     final username = args['username'] ?? 'demo';
-    
+
     Timer(const Duration(milliseconds: 300), () {
       _eventController.add({'type': 'presence', 'user': 2, 'online': true});
       _eventController.add({'type': 'presence', 'user': 4, 'online': true});
     });
-    
+
     return {'user_id': 1, 'token': username};
   }
 
@@ -164,10 +176,26 @@ class DemoApi implements XmpApi {
   @override
   Future<List<Friend>> friends() async {
     return [
-      Friend(id: 2, username: "mia", displayName: "Mia Chen", status: FriendStatus.friends),
-      Friend(id: 3, username: "leo", displayName: "Leo Park", status: FriendStatus.friends),
-      Friend(id: 4, username: "sofia", displayName: "Sofia Alvarez", status: FriendStatus.friends),
-      Friend(id: 5, username: "noah", displayName: "Noah Wright", status: FriendStatus.received),
+      Friend(
+          id: 2,
+          username: "mia",
+          displayName: "Mia Chen",
+          status: FriendStatus.friends),
+      Friend(
+          id: 3,
+          username: "leo",
+          displayName: "Leo Park",
+          status: FriendStatus.friends),
+      Friend(
+          id: 4,
+          username: "sofia",
+          displayName: "Sofia Alvarez",
+          status: FriendStatus.friends),
+      Friend(
+          id: 5,
+          username: "noah",
+          displayName: "Noah Wright",
+          status: FriendStatus.received),
     ];
   }
 
@@ -192,12 +220,49 @@ class DemoApi implements XmpApi {
     final now = DateTime.now().millisecondsSinceEpoch;
     if (conv == 1) {
       return [
-        Msg(conv: 1, seq: 1, sender: 2, kind: 0, ts: now - 3600000 * 5, text: "周末的发布会彩排你来吗？"),
-        Msg(conv: 1, seq: 2, sender: 1, kind: 0, ts: now - 3600000 * 5 + 60000, text: "来！我把新的演示版本也带上"),
-        Msg(conv: 1, seq: 3, sender: 2, kind: 0, ts: now - 3600000 * 2, text: "太好了。视频通话的延迟现在多少？"),
-        Msg(conv: 1, seq: 4, sender: 1, kind: 0, ts: now - 3600000 * 2 + 90000, text: "P2P 直连下大概 40ms，丢包 10% 也很稳 ✨"),
-        Msg(conv: 1, seq: 5, sender: 2, kind: 1, ts: now - 600000, file: FileRef(name: "launch-keynote.pdf", size: 4820113, hash: "a" * 64)),
-        Msg(conv: 1, seq: 6, sender: 2, kind: 0, ts: now - 540000, text: "这是最新的讲稿，看看有没有要改的 🙌"),
+        Msg(
+            conv: 1,
+            seq: 1,
+            sender: 2,
+            kind: 0,
+            ts: now - 3600000 * 5,
+            text: "周末的发布会彩排你来吗？"),
+        Msg(
+            conv: 1,
+            seq: 2,
+            sender: 1,
+            kind: 0,
+            ts: now - 3600000 * 5 + 60000,
+            text: "来！我把新的演示版本也带上"),
+        Msg(
+            conv: 1,
+            seq: 3,
+            sender: 2,
+            kind: 0,
+            ts: now - 3600000 * 2,
+            text: "太好了。视频通话的延迟现在多少？"),
+        Msg(
+            conv: 1,
+            seq: 4,
+            sender: 1,
+            kind: 0,
+            ts: now - 3600000 * 2 + 90000,
+            text: "P2P 直连下大概 40ms，丢包 10% 也很稳 ✨"),
+        Msg(
+            conv: 1,
+            seq: 5,
+            sender: 2,
+            kind: 1,
+            ts: now - 600000,
+            file: FileRef(
+                name: "launch-keynote.pdf", size: 4820113, hash: "a" * 64)),
+        Msg(
+            conv: 1,
+            seq: 6,
+            sender: 2,
+            kind: 0,
+            ts: now - 540000,
+            text: "这是最新的讲稿，看看有没有要改的 🙌"),
       ];
     }
     return [];
@@ -230,7 +295,8 @@ class DemoApi implements XmpApi {
   }
 
   @override
-  Future<Map<String, dynamic>> callAccept(String callId, int peer, bool video) async {
+  Future<Map<String, dynamic>> callAccept(
+      String callId, int peer, bool video) async {
     await Future.delayed(const Duration(milliseconds: 500));
     return {'sas': '359 202'};
   }

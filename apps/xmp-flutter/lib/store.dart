@@ -6,7 +6,7 @@ import 'api.dart';
 
 class XmpStore extends ChangeNotifier {
   final XmpApi api;
-  
+
   Map<String, dynamic>? me;
   List<Friend> friends = [];
   Map<int, bool> online = {};
@@ -55,7 +55,8 @@ class XmpStore extends ChangeNotifier {
         break;
       case "incoming_call":
         if (call != null) break;
-        incoming = Incoming(callId: e['call_id'], peer: e['peer'], video: e['video']);
+        incoming =
+            Incoming(callId: e['call_id'], peer: e['peer'], video: e['video']);
         notifyListeners();
         break;
       case "call_ended":
@@ -76,7 +77,9 @@ class XmpStore extends ChangeNotifier {
     call = null;
     notifyListeners();
     if (notifyBackend) {
-      try { await api.callHangup(); } catch (_) {}
+      try {
+        await api.callHangup();
+      } catch (_) {}
     }
   }
 
@@ -93,7 +96,8 @@ class XmpStore extends ChangeNotifier {
         final msgs = await api.sync(c.conv, 0);
         chats[c.peer] = Chat(convId: c.conv, msgs: msgs, unread: 0);
       }
-      final first = fs.firstWhere((f) => f.status == FriendStatus.friends, orElse: () => fs.first);
+      final first = fs.firstWhere((f) => f.status == FriendStatus.friends,
+          orElse: () => fs.first);
       selected = first.id;
       busy = false;
       notifyListeners();
@@ -108,7 +112,9 @@ class XmpStore extends ChangeNotifier {
 
   Future<void> logout() async {
     await endCallLocal(true);
-    try { await api.logout(); } catch (_) {}
+    try {
+      await api.logout();
+    } catch (_) {}
     me = null;
     friends = [];
     chats = {};
@@ -130,7 +136,7 @@ class XmpStore extends ChangeNotifier {
     final peer = selected;
     final my = me;
     if (peer == null || my == null || text.trim().isEmpty) return;
-    
+
     final tmp = Msg(
       conv: chats[peer]?.convId ?? 0,
       seq: -DateTime.now().millisecondsSinceEpoch,
@@ -139,7 +145,7 @@ class XmpStore extends ChangeNotifier {
       ts: DateTime.now().millisecondsSinceEpoch,
       text: text,
     );
-    
+
     patchChat(peer, (c) {
       c.msgs.add(tmp);
       return c;
@@ -171,6 +177,8 @@ class XmpStore extends ChangeNotifier {
     }
   }
 
-  List<Friend> get friendsOnly => friends.where((f) => f.status == FriendStatus.friends).toList();
-  List<Friend> get requests => friends.where((f) => f.status == FriendStatus.received).toList();
+  List<Friend> get friendsOnly =>
+      friends.where((f) => f.status == FriendStatus.friends).toList();
+  List<Friend> get requests =>
+      friends.where((f) => f.status == FriendStatus.received).toList();
 }

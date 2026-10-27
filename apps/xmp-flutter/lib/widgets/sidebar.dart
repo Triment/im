@@ -9,10 +9,11 @@ class Sidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = context.watch<XmpStore>();
-    
+
     return Container(
       decoration: BoxDecoration(
-        border: Border(right: BorderSide(color: Theme.of(context).dividerColor)),
+        border:
+            Border(right: BorderSide(color: Theme.of(context).dividerColor)),
       ),
       child: Column(
         children: [

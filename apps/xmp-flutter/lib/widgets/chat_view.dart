@@ -80,7 +80,9 @@ class _ChatViewState extends State<ChatView> {
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isMe ? Theme.of(context).primaryColor : Theme.of(context).cardColor,
+          color: isMe
+              ? Theme.of(context).primaryColor
+              : Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -94,7 +96,8 @@ class _ChatViewState extends State<ChatView> {
             ),
             const SizedBox(height: 4),
             Text(
-              DateFormat('HH:mm').format(DateTime.fromMillisecondsSinceEpoch(msg.ts)),
+              DateFormat('HH:mm')
+                  .format(DateTime.fromMillisecondsSinceEpoch(msg.ts)),
               style: TextStyle(
                 fontSize: 10,
                 color: isMe ? Colors.white70 : Colors.grey,

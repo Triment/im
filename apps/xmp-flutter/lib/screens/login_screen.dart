@@ -10,7 +10,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _serverController = TextEditingController(text: 'https://xmp.example.com');
+  final _serverController = TextEditingController(text: 'rt.reqack.com:4433');
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isRegister = false;
